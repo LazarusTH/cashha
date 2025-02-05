@@ -9,7 +9,7 @@ export default function UserLayout({
   children: React.ReactNode
 }) {
   return (
-    <div className="flex h-screen bg-blue-950">
+    <div className="flex h-screen" style={{backgroundColor: "#020817"}}>
       <UserSidebar />
       <main className="flex-1 p-8 overflow-y-auto">{children}</main>
     </div>
