@@ -1,5 +1,5 @@
-"use client"
 
+"use client"
 import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -20,6 +20,7 @@ import {
   ResponsiveContainer,
 } from "recharts"
 import { ArrowUpIcon, ArrowDownIcon, ArrowRightIcon, DollarSignIcon, UsersIcon } from "lucide-react"
+import React from "react"
 
 // Mock data for charts
 const monthlyData = [
@@ -151,6 +152,7 @@ export default function AdminDashboard() {
 }
 
 function MetricCard({ title, value, icon }: { title: string; value: string | number; icon: React.ReactNode }) {
+ 
     
   return (
     <Card className="m-4">

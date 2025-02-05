@@ -16,6 +16,7 @@ import {
   History,
   Menu,
   X,
+  
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -32,6 +33,7 @@ const navItems = [
   { name: "Settings", href: "/admin/settings", icon: Settings },
   { name: "Profile", href: "/admin/profile", icon: User },
 ]
+
 
 export default function AdminSidebar() {
   const pathname = usePathname()

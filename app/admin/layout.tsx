@@ -1,11 +1,8 @@
+"use client";
 
-"use client"
-
-"use client"
-
-import type React from "react"
 import AdminSidebar from "@/components/admin/AdminSidebar"
 import { usePathname } from "next/navigation"
+import type React from "react"
 
 export default function AdminLayout({
   children,
