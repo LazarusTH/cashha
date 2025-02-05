@@ -2,8 +2,8 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
-import {
+import { usePathname, useRouter } from "next/navigation"
+import { LogOut,
   LayoutDashboard,
   History,
   ArrowUpFromLine,
@@ -12,6 +12,7 @@ import {
   User,
   MessageSquare,
   Menu,
+
   X,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -30,6 +31,12 @@ const navItems = [
 export default function UserSidebar() {
   const pathname = usePathname()
   const [isOpen, setIsOpen] = useState(false)
+  const router = useRouter()
+
+  const handleLogout = () => {
+    router.push("/signin")
+  }
+
 
   return (
     <>
@@ -61,6 +68,15 @@ export default function UserSidebar() {
                 <span>{item.name}</span>
               </Link>
             ))}
+            <Button
+              onClick={handleLogout}
+              className="flex items-center w-full space-x-2 p-2 rounded-lg hover:bg-gray-700 transition-colors cursor-pointer text-lg"
+            >
+              <LogOut className="h-5 w-5" />
+              <span>
+                Logout
+              </span>
+            </Button>
           </nav>
         </ScrollArea>
       </aside>
