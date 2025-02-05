@@ -10,6 +10,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 
+// TODO: Add input validation
+
 export default function SignUp() {
 const [formData, setFormData] = useState({
 firstName: "",
@@ -33,8 +35,11 @@ idCard: null as File | null,
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    // TODO: Integrate registration API call
+    // TODO: send formData to backend
     console.log("Sign up with:", formData)
+    // TODO: handle api errors
+
+    
   }
 
   return (

@@ -1,5 +1,7 @@
 
 "use client"
+// Backend Integration: This file requires backend integration to fetch real data.
+
 import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -22,7 +24,7 @@ import {
 import { ArrowUpIcon, ArrowDownIcon, ArrowRightIcon, DollarSignIcon, UsersIcon } from "lucide-react"
 import React from "react"
 
-// Mock data for charts
+// Backend Integration: Fetch monthly chart data from backend API
 const monthlyData = [
   { month: "Jan", deposits: 5000, withdrawals: 3000, transfers: 2000, fees: 500 },
   { month: "Feb", deposits: 6000, withdrawals: 3500, transfers: 2500, fees: 600 },
@@ -32,7 +34,7 @@ const monthlyData = [
   { month: "Jun", deposits: 10000, withdrawals: 5500, transfers: 4500, fees: 1000 },
 ]
 
-// Mock data for recent transactions
+// Backend Integration: Fetch recent transactions data from backend API
 const recentTransactions = [
   { id: 1, user: "John Doe", type: "Deposit", amount: 1000, date: "2023-07-05" },
   { id: 2, user: "Jane Smith", type: "Withdrawal", amount: 500, date: "2023-07-05" },
@@ -44,14 +46,13 @@ const recentTransactions = [
 export default function AdminDashboard() {
   const [selectedMonth, setSelectedMonth] = useState("Jun")
 
-  // TODO: integrate API for dynamic dashboard data
+  // Backend Integration: Fetch data from backend API
   const totalTransactions = 15000
+  // Backend Integration: Fetch data from backend API
   const totalDeposits = 45000
+  // Backend Integration: Fetch data from backend API
   const totalWithdrawals = 25000
-  const totalTransfers = 20000
-  const totalFees = 5000
-  const totalUsers = 1000
-
+ // Backend Integration: Fetch data from backend API
   return (
     <div className="container max-w-7xl mx-auto px-4 py-6">
       <div className="space-y-6">
@@ -59,25 +60,27 @@ export default function AdminDashboard() {
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           <MetricCard
-            title="Total Transactions"
-            value={totalTransactions}
-            icon={<ArrowRightIcon className="h-4 w-4" />}
-          />
-          <MetricCard title="Total Deposits" value={`$${totalDeposits}`} icon={<ArrowUpIcon className="h-4 w-4" />} />
+          title="Total Transactions"
+          value={totalTransactions}
+          icon={<ArrowRightIcon className="h-4 w-4" />}
+        />
+          <MetricCard title="Total Deposits" value={`$${totalDeposits}`} icon={<ArrowUpIcon className="h-4 w-4" />}/>
           <MetricCard
-            title="Total Withdrawals"
-            value={`$${totalWithdrawals}`}
-            icon={<ArrowDownIcon className="h-4 w-4" />}
-          />
+          title="Total Withdrawals"
+          value={`$${totalWithdrawals}`}
+          icon={<ArrowDownIcon className="h-4 w-4" />}
+        />
           <MetricCard
-            title="Total Transfers"
-            value={`$${totalTransfers}`}
-            icon={<ArrowRightIcon className="h-4 w-4" />}
-          />
-          <MetricCard title="Total Fees" value={`$${totalFees}`} icon={<DollarSignIcon className="h-4 w-4" />} />
-          <MetricCard title="Total Users" value={totalUsers} icon={<UsersIcon className="h-4 w-4" />} />
+          title="Total Transfers"
+          // Backend Integration: Fetch data from backend API
+          value={`$${20000}`}
+          icon={<ArrowRightIcon className="h-4 w-4" />}
+        />
+        <MetricCard title="Total Fees" value={`$${5000}`} icon={<DollarSignIcon className="h-4 w-4" />}/>
+        <MetricCard title="Total Users" value={1000} icon={<UsersIcon className="h-4 w-4" />} />
         </div>
 
+        {/*Backend Integration: Fetch data from backend API*/}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle>Monthly Fees</CardTitle>
@@ -134,6 +137,7 @@ export default function AdminDashboard() {
                 </TableHeader>
                 <TableBody>
                   {recentTransactions.map((transaction) => (
+                         // Backend Integration: Fetch data from backend API
                     <TableRow key={transaction.id}>
                       <TableCell>{transaction.user}</TableCell>
                       <TableCell>{transaction.type}</TableCell>

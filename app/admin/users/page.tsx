@@ -1,6 +1,7 @@
 "use client"
+// Backend Integration: This whole file needs to be integrated with the backend API to fetch real user data and perform operations on it.
 
-import { useState } from "react"
+import { useState, ChangeEvent } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -11,7 +12,21 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import Image from "next/image"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
-// Mock user data
+interface User {
+  id: number;
+  firstName: string;
+  lastName: string;
+  username: string;
+  email: string;
+  dateOfBirth: string;
+  placeOfBirth: string;
+  residence: string;
+  nationality: string;
+  balance: number;
+  sendLimit: number | null;
+  withdrawLimit: number | null;
+  status: string;
+};
 const mockUsers = [
   {
     id: 1,
@@ -49,6 +64,7 @@ const mockUsers = [
   },
 ]
 
+
 export default function UsersManagement() {
   const [users, setUsers] = useState(mockUsers)
   const [pendingUsers, setPendingUsers] = useState(mockUsers.filter((user) => user.status === "Pending"))
@@ -59,57 +75,61 @@ export default function UsersManagement() {
   const [isUserDetailDialogOpen, setIsUserDetailDialogOpen] = useState(false)
 
   const handleCreateUser = (
-    userData: Omit<(typeof mockUsers)[0], "id" | "balance" | "status" | "idCard"> & { idCard: File | null },
+    userData: Omit<User, "id" | "balance" | "status"> & { idCard: File | null | string },
   ) => {
-    // TODO: Integrate with backend API to create new user
+    // Backend Integration: Integrate with backend API to create new user
     const newUser = {
       ...userData,
-      id: users.length + 1,
-      balance: 0,
       status: "Pending",
+      id: users.length + 1, 
+      balance: 0,
       sendLimit: null,
       withdrawLimit: null,
+      idCard: userData.idCard,
+      role:"user"
     }
     setUsers([...users, newUser])
-    setPendingUsers([...pendingUsers, newUser])
+     if(newUser.status === "Pending"){
+      setPendingUsers([...pendingUsers, newUser]);
+     }
     setIsCreateDialogOpen(false)
+   
   }
 
   const handleApproveUser = (userId: number) => {
-    // TODO: Integrate with backend API to approve user
+    // Backend Integration: Integrate with backend API to approve user
     setUsers(users.map((user) => (user.id === userId ? { ...user, status: "Active" } : user)))
     setPendingUsers(pendingUsers.filter((user) => user.id !== userId))
     setIsDetailDialogOpen(false)
-    // TODO: Send email notification
+    // Backend Integration: Send email notification
     console.log(`Approved user ${userId}`)
   }
 
   const handleRejectUser = (userId: number, reason: string) => {
-    // TODO: Integrate with backend API to reject user
+    // Backend Integration: Integrate with backend API to reject user
     setUsers(users.map((user) => (user.id === userId ? { ...user, status: "Rejected" } : user)))
-    setPendingUsers(pendingUsers.filter((user) => user.id !== userId))
+    setPendingUsers(pendingUsers.filter((user) => user.id !== userId)) 
     setIsDetailDialogOpen(false)
-    // TODO: Send email notification with rejection reason
+    // Backend Integration: Send email notification with rejection reason
     console.log(`Rejected user ${userId} with reason: ${reason}`)
     setRejectionReason("")
   }
 
   const handleUpdateUserBalance = (userId: number, amount: number) => {
-    // TODO: Integrate with backend API to update user balance
+    // Backend Integration: Integrate with backend API to update user balance
     setUsers(users.map((user) => (user.id === userId ? { ...user, balance: user.balance + amount } : user)))
   }
 
   const handleUpdateUserLimits = (userId: number, type: "send" | "withdraw", limit: number | null) => {
-    // TODO: Integrate with backend API to update user limits
+    // Backend Integration: Integrate with backend API to update user limits
     setUsers(
       users.map((user) =>
         user.id === userId ? { ...user, [type === "send" ? "sendLimit" : "withdrawLimit"]: limit } : user,
       ),
     )
   }
-
   const handleDeleteUser = (userId: number) => {
-    // TODO: Integrate with backend API to delete user
+    // Backend Integration: Integrate with backend API to delete user
     setUsers(users.filter((user) => user.id !== userId))
     setPendingUsers(pendingUsers.filter((user) => user.id !== userId))
   }
@@ -151,6 +171,7 @@ export default function UsersManagement() {
               </TableRow>
             </TableHeader>
             <TableBody>
+              {/* Backend Integration: Fetch user data from backend API and map them here */}
               {users.map((user) => (
                 <TableRow key={user.id}>
                   <TableCell>{`${user.firstName} ${user.lastName}`}</TableCell>
@@ -194,6 +215,7 @@ export default function UsersManagement() {
                 </TableRow>
               </TableHeader>
               <TableBody>
+                {/* Backend Integration: Fetch pending user data from backend API and map them here */}
                 {pendingUsers.map((user) => (
                   <TableRow key={user.id}>
                     <TableCell>{`${user.firstName} ${user.lastName}`}</TableCell>
@@ -247,7 +269,7 @@ function CreateUserForm({ onSubmit }: { onSubmit: (userData: any) => void }) {
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
-    username: "",
+    username:"",
     email: "",
     dateOfBirth: "",
     placeOfBirth: "",
@@ -260,14 +282,16 @@ function CreateUserForm({ onSubmit }: { onSubmit: (userData: any) => void }) {
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     onSubmit({ ...formData, idCard: formData.idCard })
+
   }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    if (e.target.type === "file") {
-      setFormData({ ...formData, [e.target.name]: e.target.files![0] })
-    } else {
+    if (e.target instanceof HTMLInputElement && e.target.type === "file" && e.target.files) {
+        setFormData({ ...formData, [e.target.name]: e.target.files[0] });
+    }else {
       setFormData({ ...formData, [e.target.name]: e.target.value })
     }
+
   }
 
   return (
@@ -388,6 +412,10 @@ function UserDetailForm({ user, onApprove, onReject, onUpdateLimits }: Props) {
     onUpdateLimits(user.id, "withdraw", limits.withdraw.type === "none" ? null : limits.withdraw.value)
   }
 
+  function onDelete(id: number): void {
+    throw new Error("Function not implemented.")
+  }
+
   return (
     <div className="space-y-4">
       <div>
@@ -433,7 +461,7 @@ function UserDetailForm({ user, onApprove, onReject, onUpdateLimits }: Props) {
         <div className="mt-2 border rounded-lg p-2">
           <Image
             src={user.idCard || "/placeholder.svg"}
-            alt="ID Card"
+            alt={`ID Card of ${user.firstName}`}
             width={300}
             height={200}
             className="rounded-md"

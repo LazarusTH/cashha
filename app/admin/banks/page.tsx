@@ -1,3 +1,5 @@
+// Backend Integration: This entire file needs to be connected to the backend to fetch and manage real data for banks and users.
+
 "use client"
 
 import { useState } from "react"
@@ -5,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -38,7 +41,7 @@ export default function BanksManagement() {
   const [selectedBank, setSelectedBank] = useState<(typeof mockBanks)[0] | null>(null)
 
   const handleAddBank = (bankName: string) => {
-    // TODO: Integrate with backend API to add new bank
+    // Backend Integration: Integrate with backend API to add new bank
     const newBank = {
       id: banks.length + 1,
       name: bankName,
@@ -48,13 +51,13 @@ export default function BanksManagement() {
   }
 
   const handleEditBank = (bankId: number, newName: string) => {
-    // TODO: Integrate with backend API to edit bank
+    // Backend Integration: Integrate with backend API to edit bank
     setBanks(banks.map((bank) => (bank.id === bankId ? { ...bank, name: newName } : bank)))
   }
 
   const handleAssignBank = (bankId: number, userIds: number[]) => {
-    // TODO: Integrate with backend API to assign bank to users
-    const newAssignments = userIds.map((userId) => ({ userId, bankId }))
+    // Backend Integration: Integrate with backend API to assign bank to users
+      const newAssignments = userIds.map((userId) => ({ userId, bankId }))
     setUserBanks([...userBanks.filter((ub) => ub.bankId !== bankId), ...newAssignments])
     setIsAssignBankDialogOpen(false)
   }
@@ -129,6 +132,7 @@ function AddBankForm({ onSubmit }: { onSubmit: (bankName: string) => void }) {
   const [bankName, setBankName] = useState("")
 
   const handleSubmit = (e: React.FormEvent) => {
+
     e.preventDefault()
     onSubmit(bankName)
     setBankName("")

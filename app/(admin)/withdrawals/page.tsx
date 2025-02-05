@@ -1,3 +1,4 @@
+// Backend Integration: This page needs to fetch withdrawal requests data from the backend API.
 "use client"
 
 import { useState } from "react"
@@ -6,13 +7,14 @@ import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
-// Mock data
+// Mock data (Replace this with data fetched from the backend)
 const withdrawalRequests = [
   { id: 1, user: "John Doe", amount: 1000, status: "Pending" },
   { id: 2, user: "Jane Smith", amount: 500, status: "Approved" },
-  // Add more mock requests...
+  // Backend Integration: Fetch more data from the backend API
 ]
 
+// Backend Integration: Fetch the real withdrawal request data from the API.
 export default function WithdrawalRequests() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [selectedRequest, setSelectedRequest] = useState<any>(null)
@@ -23,7 +25,7 @@ export default function WithdrawalRequests() {
   }
 
   const handleReject = (request: any) => {
-    // TODO: Implement rejection logic
+    // Backend Integration: Implement logic to send rejection request to the API.
     console.log("Rejecting request:", request)
   }
 
@@ -74,7 +76,7 @@ export default function WithdrawalRequests() {
 function ApprovalForm({ request, onClose }: { request: any; onClose: () => void }) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    // TODO: Implement approval logic
+    // Backend Integration: Implement logic to send approval request to the API.
     console.log("Approving request:", request)
     onClose()
   }

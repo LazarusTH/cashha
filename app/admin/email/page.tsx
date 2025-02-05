@@ -1,5 +1,7 @@
 "use client"
 
+// Backend Integration: This entire file needs backend integration to fetch and send emails.
+
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -9,14 +11,14 @@ import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { ScrollArea } from "@/components/ui/scroll-area"
 
-// Mock users data
+// Mock users data, replace this with backend API call.
 const mockUsers = [
   { id: 1, username: "johndoe", email: "john@example.com" },
   { id: 2, username: "janesmith", email: "jane@example.com" },
-  // Add more users...
 ]
 
 export default function EmailModulePage() {
+  // Backend Integration: Replace mock data with data fetched from backend.
   const [selectedUsers, setSelectedUsers] = useState<number[]>([])
   const [subject, setSubject] = useState("")
   const [message, setMessage] = useState("")
@@ -54,7 +56,9 @@ export default function EmailModulePage() {
                 onCheckedChange={handleSelectAll}
               />
               <Label htmlFor="selectAll">Select All Users</Label>
+              
             </div>
+            {/* Backend Integration: Fetch user data from backend API */}
             <ScrollArea className="h-[200px] border rounded-md p-4">
               {mockUsers.map((user) => (
                 <div key={user.id} className="flex items-center space-x-2 py-2">
@@ -93,6 +97,7 @@ export default function EmailModulePage() {
                 className="min-h-[200px]"
               />
             </div>
+            {/* Backend Integration: Send email through backend API */}
             <Button type="submit" disabled={selectedUsers.length === 0}>
               Send Email
             </Button>

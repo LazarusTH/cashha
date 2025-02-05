@@ -1,4 +1,6 @@
 "use client"
+// Backend Developer: This entire page needs backend integration to fetch and submit real data.
+// Please replace the mock data with real data from the backend API.
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
@@ -8,20 +10,21 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 
 // Mock data
+// Backend Integration: Replace this mock data with real data from the backend API
 const withdrawalHistory = [
   { id: 1, amount: 1000, status: "Completed", date: "2023-06-01" },
   { id: 2, amount: 500, status: "Pending", date: "2023-06-05" },
-  // Add more mock history...
 ]
 
+// Backend Integration: Replace this mock data with real data from the backend API
 const banks = [
   { id: 1, name: "Bank A" },
   { id: 2, name: "Bank B" },
-  // Add more mock banks...
 ]
 
 export default function WithdrawPage() {
   const [amount, setAmount] = useState("")
+  // Backend Integration: Fetch Bank data from backend API
   const [bank, setBank] = useState("")
   const [accountNumber, setAccountNumber] = useState("")
   const [accountHolderName, setAccountHolderName] = useState("")
@@ -29,7 +32,7 @@ export default function WithdrawPage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     // TODO: Implement withdrawal request logic
-    console.log("Withdrawal request:", { amount, bank, accountNumber, accountHolderName })
+    // Backend Integration: Send withdrawal request to the backend API
   }
 
   return (
@@ -104,6 +107,7 @@ export default function WithdrawPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
+              {/* Backend Integration: Fetch Withdrawal History data from backend API */}
               {withdrawalHistory.map((withdrawal) => (
                 <TableRow key={withdrawal.id}>
                   <TableCell>{withdrawal.amount}</TableCell>

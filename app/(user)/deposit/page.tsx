@@ -1,16 +1,18 @@
 "use client"
+// Backend Integration: This entire file needs to be connected to a backend API to fetch real data and handle deposit requests.
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+// Backend Integration: This is a mock data. It needs to be replaced with real data fetched from the backend.
+
 
 // Mock data
 const depositHistory = [
   { id: 1, amount: 1000, status: "Completed", date: "2023-06-01" },
   { id: 2, amount: 500, status: "Pending", date: "2023-06-05" },
-  // Add more mock history...
 ]
 
 export default function DepositPage() {
@@ -18,8 +20,8 @@ export default function DepositPage() {
   const [receipt, setReceipt] = useState<File | null>(null)
 
   const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    // TODO: Implement deposit request logic
+    e.preventDefault();
+    // Backend Integration: Handle the deposit request, including amount and receipt.
     console.log("Deposit request:", { amount, receipt })
   }
 
@@ -56,6 +58,7 @@ export default function DepositPage() {
           <Table>
             <TableHeader>
               <TableRow>
+                 {/* Backend Integration: fetch data from backend */}
                 <TableHead>Amount (ETB)</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Date</TableHead>
@@ -63,6 +66,7 @@ export default function DepositPage() {
             </TableHeader>
             <TableBody>
               {depositHistory.map((deposit) => (
+                // Backend Integration: Replace `depositHistory` with the actual data fetched from backend API
                 <TableRow key={deposit.id}>
                   <TableCell>{deposit.amount}</TableCell>
                   <TableCell>{deposit.status}</TableCell>

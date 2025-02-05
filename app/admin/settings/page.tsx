@@ -1,4 +1,5 @@
 "use client"
+// Backend Integration: This entire file needs to be connected to the backend to fetch, update, and save settings data.
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
@@ -8,12 +9,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 
 export default function SettingsPage() {
+  // Backend Integration: Fetch initial settings data from backend API
   const [settings, setSettings] = useState({
     generalWithdrawalLimit: "",
     generalSendingLimit: "",
     maintenanceMode: false,
   })
 
+  // Backend Integration: Implement a mechanism to send settings updates to the backend.
   const handleSettingChange = (setting: string, value: any) => {
     setSettings((prevSettings) => ({
       ...prevSettings,
@@ -21,8 +24,8 @@ export default function SettingsPage() {
     }))
   }
 
-  const handleSaveSettings = () => {
-    // TODO: Integrate with backend API to save settings
+    const handleSaveSettings = () => {
+    // Backend Integration: Save the updated settings to the backend API.
     console.log("Saving settings:", settings)
   }
 

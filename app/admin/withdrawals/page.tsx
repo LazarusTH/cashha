@@ -1,3 +1,4 @@
+// Backend Integration: This whole file needs to fetch and update data from the backend API.
 "use client"
 
 import { useState } from "react"
@@ -7,18 +8,36 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
+import { Textarea} from "@/components/ui/textarea"
 import { ScrollArea } from "@/components/ui/scroll-area"
 
+
+interface WithdrawalRequest {
+  id: number;
+  userId: number;
+  username: string;
+  amount: number;
+  status: string;
+  date: string;
+  bankName: string;
+  accountNumber: string;
+  accountHolderName: string;
+  transactionId?: string; // Made optional
+  processingDate?: string;
+  processingTime?: string;
+  rejectionReason?: string;
+}
+
 // Mock withdrawal requests data
-const mockWithdrawalRequests = [
-  {
+const mockWithdrawalRequests: WithdrawalRequest[] = [
+    {
     id: 1,
     userId: 1,
     username: "johndoe",
     amount: 500,
     status: "Pending",
     date: "2023-07-05",
+
     bankName: "Bank of America",
     accountNumber: "1234567890",
     accountHolderName: "John Doe",
@@ -36,7 +55,7 @@ const mockWithdrawalRequests = [
     transactionId: "12345",
     processingDate: "2023-07-05",
     processingTime: "10:00",
-  },
+  }, 
   {
     id: 3,
     userId: 3,
@@ -50,29 +69,36 @@ const mockWithdrawalRequests = [
     rejectionReason: "Insufficient funds",
   },
 ]
+//TODO: fix the request types
 
 export default function WithdrawalRequestsPage() {
-  const [requests, setRequests] = useState(mockWithdrawalRequests)
+  const [requests, setRequests] = useState<WithdrawalRequest[]>(mockWithdrawalRequests)
   const [selectedRequest, setSelectedRequest] = useState<(typeof mockWithdrawalRequests)[0] | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false)
 
+
   const handleApprove = (requestId: number, transactionDetails: string) => {
-    // TODO: Integrate with backend API to approve withdrawal request
+    // Backend Integration: Send an API request to approve the withdrawal request
     setRequests(requests.map((request) => (request.id === requestId ? { ...request, status: "Approved" } : request)))
     setIsDialogOpen(false)
-    // TODO: Send email notification to user
+    // Backend Integration: Send an email notification to the user
     console.log(`Approved request ${requestId} with details: ${transactionDetails}`)
   }
-
+  
   const handleReject = (requestId: number, reason: string) => {
-    // TODO: Integrate with backend API to reject withdrawal request
+    // Backend Integration: Integrate with backend API to reject withdrawal request
     setRequests(
-      requests.map((request) =>
-        request.id === requestId ? { ...request, status: "Rejected", rejectionReason: reason } : request,
-      ),
+      requests.map((request) => {
+        if (request.id === requestId) {
+            return { ...request, status: "Rejected", rejectionReason: reason };
+        } else {
+            return request;
+        }
+    })
     )
-    setIsDialogOpen(false)
+        setIsDialogOpen(false)
+
     // TODO: Send email notification to user
     console.log(`Rejected request ${requestId} with reason: ${reason}`)
   }
@@ -97,6 +123,7 @@ export default function WithdrawalRequestsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
+              {/* Backend Integration: Fetch real data and map it here */}
               {requests.map((request) => (
                 <TableRow key={request.id}>
                   <TableCell>{request.username}</TableCell>

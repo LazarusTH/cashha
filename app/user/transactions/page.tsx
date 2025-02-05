@@ -1,3 +1,5 @@
+// Backend Integration: This page needs to fetch real transaction data from the backend API.
+// Please set up an API endpoint to retrieve transaction data and replace the mock data.
 "use client"
 
 import { useState } from "react"
@@ -7,19 +9,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 
-// Mock data for transactions
+// Mock data for transactions (Replace this with real data from the backend)
 const mockTransactions = [
   { id: 1, type: "Deposit", amount: 1000, status: "Completed", date: "2023-07-05", details: "Bank transfer" },
   { id: 2, type: "Withdrawal", amount: -500, status: "Pending", date: "2023-07-04", details: "ATM withdrawal" },
   { id: 3, type: "Send", amount: -200, status: "Completed", date: "2023-07-03", details: "To: john@example.com" },
   { id: 4, type: "Receive", amount: 300, status: "Completed", date: "2023-07-02", details: "From: jane@example.com" },
   { id: 5, type: "Deposit", amount: 1500, status: "Completed", date: "2023-07-01", details: "Cash deposit" },
-  // Add more mock transactions as needed
 ]
 
 export default function TransactionHistoryPage() {
-  const [transactions, setTransactions] = useState(mockTransactions)
+  const [transactions, setTransactions] = useState(mockTransactions) // Backend Integration: Replace mockTransactions with data from backend API
   const [filter, setFilter] = useState("")
+  // Backend Integration: Get Sort from backend API
   const [sortBy, setSortBy] = useState("date")
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc")
 
@@ -128,4 +130,3 @@ export default function TransactionHistoryPage() {
     </div>
   )
 }
-

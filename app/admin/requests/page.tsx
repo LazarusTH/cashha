@@ -1,5 +1,7 @@
 "use client"
 
+// Backend Integration: This file needs to fetch real data from the backend API and handle interactions with it.
+
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -66,7 +68,7 @@ export default function RequestsManagement() {
   const [rejectionReason, setRejectionReason] = useState("")
 
   const handleApprove = (type: "deposit" | "withdrawal" | "sending", requestId: number) => {
-    // TODO: Integrate with backend API to approve request
+    // Backend Integration: Integrate with backend API to approve request
     setRequests({
       ...requests,
       [type]: requests[type].map((request) =>
@@ -74,12 +76,12 @@ export default function RequestsManagement() {
       ),
     })
     setIsDetailDialogOpen(false)
-    // TODO: Send email notification
+    // Backend Integration: Send email notification
     console.log(`Approved ${type} request ${requestId}`)
   }
 
   const handleReject = (type: "deposit" | "withdrawal" | "sending", requestId: number) => {
-    // TODO: Integrate with backend API to reject request
+    // Backend Integration: Integrate with backend API to reject request
     setRequests({
       ...requests,
       [type]: requests[type].map((request) =>
@@ -87,7 +89,7 @@ export default function RequestsManagement() {
       ),
     })
     setIsDetailDialogOpen(false)
-    // TODO: Send email notification with rejection reason
+    // Backend Integration: Send email notification with rejection reason
     console.log(`Rejected ${type} request ${requestId} with reason: ${rejectionReason}`)
     setRejectionReason("")
   }

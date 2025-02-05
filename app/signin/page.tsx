@@ -9,13 +9,16 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 
-
 export default function SignIn() {
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const router = useRouter()
+  // TODO: Add input validation
 
   const handleSubmit = (e: React.FormEvent) => {
+    // TODO: send username and password to backend
+    // TODO: handle api errors
+    // TODO: Implement authentication logic
     e.preventDefault()
     // TODO: Integrate authentication API call
     console.log("Sign in with:", { username, password })
@@ -67,4 +70,3 @@ export default function SignIn() {
     </div>
   )
 }
-

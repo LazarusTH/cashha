@@ -1,3 +1,7 @@
+// Backend Integration Required:
+// This entire page needs to be integrated with the backend to fetch real deposit request data,
+// update the status of requests, and send email notifications.
+
 "use client"
 
 import { useState } from "react"
@@ -10,17 +14,17 @@ import { Label } from "@/components/ui/label"
 import Image from "next/image"
 import { ScrollArea } from "@/components/ui/scroll-area"
 
-// Mock deposit requests data
-const mockDepositRequests = [
+// Mock data, Replace this with real data from the backend
+const mockDepositRequests: DepositRequest[] = [
   {
     id: 1,
+    transactionId:"123456789",
     userId: 1,
     username: "johndoe",
     amount: 1000,
     status: "Pending",
     date: "2023-07-05",
     receipt: "/placeholder.svg?height=300&width=200",
-    transactionId: "12345",
     processingDate: "2023-07-06",
     processingTime: "10:00 AM",
   },
@@ -28,11 +32,11 @@ const mockDepositRequests = [
     id: 2,
     userId: 2,
     username: "janesmith",
-    amount: 1500,
+    amount: 1500, 
     status: "Approved",
     date: "2023-07-04",
     receipt: "/placeholder.svg?height=300&width=200",
-    transactionId: "67890",
+    transactionId: "TXN-67890",
     processingDate: "2023-07-05",
     processingTime: "11:30 AM",
   },
@@ -48,30 +52,61 @@ const mockDepositRequests = [
   },
 ]
 
+type DepositRequest = {
+  id: number;
+  userId: number;
+  username: string;
+  amount: number;
+  status: "Pending" | "Approved" | "Rejected";
+  date: string;
+  receipt: string
+  transactionId?: string
+  processingDate?: string
+  processingTime?: string
+  rejectionReason?: string
+}
+
 export default function DepositRequestsPage() {
-  const [requests, setRequests] = useState(mockDepositRequests)
-  const [selectedRequest, setSelectedRequest] = useState<(typeof mockDepositRequests)[0] | null>(null)
+  const [requests, setRequests] = useState<DepositRequest[]>(mockDepositRequests)
+  const [selectedRequest, setSelectedRequest] = useState<DepositRequest | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [showDetailView, setShowDetailView] = useState(false)
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false)
 
-  const handleApprove = (requestId: number) => {
-    // TODO: Integrate with backend API to approve deposit request
-    setRequests(requests.map((request) => (request.id === requestId ? { ...request, status: "Approved" } : request)))
-    setIsDialogOpen(false)
-    // TODO: Send email notification to user
+  const handleApprove = (requestId: number, transactionId: string) => {
+    // Backend Integration: Integrate with backend API to approve deposit request
+    setRequests((prevRequests) =>
+      prevRequests.map((request) => {
+        if (request.id === requestId) {
+          return { ...request, status: "Approved", transactionId: transactionId };
+        } else {
+          return request;
+        }
+      })
+    );
+  
+
+    setIsDialogOpen(false);
+
+    // Backend Integration: Send email notification to user
     console.log(`Approved deposit request ${requestId}`)
   }
 
   const handleReject = (requestId: number, reason: string) => {
-    // TODO: Integrate with backend API to reject deposit request
-    setRequests(
-      requests.map((request) =>
-        request.id === requestId ? { ...request, status: "Rejected", rejectionReason: reason } : request,
-      ),
-    )
+    // Backend Integration: Integrate with backend API to reject deposit request
+     setRequests((prevRequests) =>
+      prevRequests.map((request) => {
+        if (request.id === requestId) {
+          return { ...request, status: "Rejected", rejectionReason: reason };
+        } else {
+          return request;
+        }
+      })
+    );
+    
+
     setIsDialogOpen(false)
-    // TODO: Send email notification to user
+    // Backend Integration: Send email notification to user
     console.log(`Rejected deposit request ${requestId} with reason: ${reason}`)
   }
 
@@ -138,7 +173,7 @@ export default function DepositRequestsPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Review Deposit Request</DialogTitle>
-          </DialogHeader>
+          </DialogHeader>    
           {selectedRequest && (
             <DepositReviewForm request={selectedRequest} onApprove={handleApprove} onReject={handleReject} />
           )}
@@ -164,15 +199,17 @@ function DepositReviewForm({
   onApprove,
   onReject,
 }: {
-  request: (typeof mockDepositRequests)[0]
-  onApprove: (requestId: number) => void
+  request: DepositRequest
+  onApprove: (requestId: number, transactionId: string ) => void
   onReject: (requestId: number, reason: string) => void
 }) {
   const [rejectionReason, setRejectionReason] = useState("")
+  const [transactionId, setTransactionId] = useState("");
 
   return (
     <ScrollArea className="h-[60vh]">
       <div className="space-y-4 pr-4">
+        
         <div>
           <Label>Username</Label>
           <p>{request.username}</p>
@@ -198,7 +235,7 @@ function DepositReviewForm({
           </div>
         </div>
         <div className="flex space-x-2">
-          <Button onClick={() => onApprove(request.id)}>Approve</Button>
+          <Button onClick={() => onApprove(request.id, transactionId)}>Approve</Button>
           <Button
             variant="outline"
             onClick={() => {
@@ -207,6 +244,15 @@ function DepositReviewForm({
           >
             Reject
           </Button>
+        </div>
+        <div>
+          <Label htmlFor="transactionId">Transaction ID</Label>
+          <Input
+            id="transactionId"
+            value={transactionId}
+            onChange={(e) => setTransactionId(e.target.value)}
+            placeholder="Enter Transaction ID"
+          />
         </div>
         <div>
           <Label htmlFor="rejectionReason">Rejection Reason</Label>
@@ -222,7 +268,7 @@ function DepositReviewForm({
   )
 }
 
-function DepositDetailView({ request }: { request: (typeof mockDepositRequests)[0] }) {
+function DepositDetailView({ request }: { request: DepositRequest }) {
   return (
     <div className="space-y-4">
       <div>

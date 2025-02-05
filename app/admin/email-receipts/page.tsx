@@ -1,4 +1,5 @@
 "use client"
+// Backend Integration: This file needs to be integrated with the backend to fetch real user data and handle email sending.
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
@@ -9,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 
-// Mock users data
+// Mock users data - replace with actual data fetching from backend
 const mockUsers = [
   { id: 1, username: "johndoe", email: "john@example.com" },
   { id: 2, username: "janesmith", email: "jane@example.com" },
@@ -17,7 +18,9 @@ const mockUsers = [
 ]
 
 export default function EmailReceiptModule() {
-  const [users, setUsers] = useState(mockUsers)
+  // Backend Integration: Replace mockUsers with actual data fetching from an API endpoint.
+  const [users, setUsers] = useState(mockUsers);
+  
   const [selectedUsers, setSelectedUsers] = useState<number[]>([])
   const [subject, setSubject] = useState("")
   const [message, setMessage] = useState("")
@@ -39,7 +42,7 @@ export default function EmailReceiptModule() {
   }
 
   const handleSendEmails = () => {
-    // TODO: Integrate with backend API to send emails
+    // Backend Integration: Integrate with backend API to send emails to selected users
     console.log("Sending emails to:", selectedUsers)
     console.log("Subject:", subject)
     console.log("Message:", message)
@@ -78,6 +81,7 @@ export default function EmailReceiptModule() {
             </TableHeader>
             <TableBody>
               {users.map((user) => (
+                 // Backend Integration: User data should be mapped based on the API response format.
                 <TableRow key={user.id}>
                   <TableCell>
                     <Checkbox
@@ -124,4 +128,3 @@ export default function EmailReceiptModule() {
     </div>
   )
 }
-

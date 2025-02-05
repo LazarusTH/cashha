@@ -1,4 +1,6 @@
 "use client"
+// Backend Integration: This entire page needs to be integrated with the backend API.
+// Need to fetch and send withdrawal requests and transactions data to the backend.
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
@@ -7,20 +9,27 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 
-// Mock data for withdrawal transactions and banks
+
+export default function WithdrawPage() {
+
+
+// Mock data for withdrawal transactions
+// Backend Integration: Fetch real data from backend API
 const withdrawalTransactions = [
   { id: 1, amount: 800, status: "Completed", date: "2023-07-02" },
   { id: 2, amount: 1200, status: "Pending", date: "2023-07-01" },
   { id: 3, amount: 500, status: "Rejected", date: "2023-06-30" },
 ]
 
+// Backend Integration: Fetch banks from backend API
 const banks = [
   { id: 1, name: "Bank A" },
   { id: 2, name: "Bank B" },
   { id: 3, name: "Bank C" },
 ]
 
-export default function WithdrawPage() {
+
+
   const [amount, setAmount] = useState("")
   const [bank, setBank] = useState("")
   const [accountNumber, setAccountNumber] = useState("")
@@ -28,14 +37,16 @@ export default function WithdrawPage() {
   const [fee, setFee] = useState(0)
 
   useEffect(() => {
-    // TODO: Replace with actual fee calculation logic
+    // Backend Integration: Replace with actual fee calculation logic from backend API
     setFee(Number.parseFloat(amount) * 0.01)
   }, [amount])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // TODO: Integrate with backend API to submit withdrawal request
+    // Backend Integration: Send withdrawal request data to backend API
+    // Backend Integration: Integrate with backend API to submit withdrawal request
     console.log("Withdrawal request:", { amount, bank, accountNumber, accountHolderName, fee })
+     // TODO: Handle api errors
 
     // TODO: Update UI to show pending transaction
   }
@@ -99,6 +110,7 @@ export default function WithdrawPage() {
               <p className="text-sm font-medium text-gray-700">Fee: {fee.toFixed(2)} ETB</p>
             </div>
             <Button type="submit">Submit Withdrawal Request</Button>
+             {/* Backend Integration: Handle api errors from form */}
           </form>
         </CardContent>
       </Card>

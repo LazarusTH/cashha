@@ -1,4 +1,6 @@
 "use client"
+// Backend Integration: This entire page needs to be integrated with the backend API.
+// It should fetch real admin profile data, and update profile data when the form is submitted.
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
@@ -28,8 +30,8 @@ export default function AdminProfilePage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    // TODO: Integrate with backend API to update admin profile
-    console.log("Updated admin data:", adminData)
+    // Backend Integration: Send updated `adminData` to backend API to update the admin profile
+      console.log("Updated admin data:", adminData)
     setIsEditing(false)
   }
 
@@ -47,6 +49,7 @@ export default function AdminProfilePage() {
               <Label htmlFor="name">Name</Label>
               <Input id="name" name="name" value={adminData.name} onChange={handleInputChange} disabled={!isEditing} />
             </div>
+              {/* Backend Integration: Data for email is fetched from the backend API. */}
             <div>
               <Label htmlFor="email">Email</Label>
               <Input
@@ -58,10 +61,12 @@ export default function AdminProfilePage() {
                 disabled={!isEditing}
               />
             </div>
+              {/* Backend Integration: Data for role is fetched from the backend API. */}
             <div>
               <Label htmlFor="role">Role</Label>
               <Input id="role" value={adminData.role} disabled />
             </div>
+              {/* Backend Integration: Data for Last login is fetched from the backend API. */}
             <div>
               <Label htmlFor="lastLogin">Last Login</Label>
               <Input id="lastLogin" value={adminData.lastLogin} disabled />

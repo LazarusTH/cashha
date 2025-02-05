@@ -1,18 +1,20 @@
 "use client"
 
+// Backend Integration: This file needs to be connected to the backend to fetch real data and handle deposit requests.
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 
-// Mock data for deposit transactions
+// Mock data for deposit transactions - This will be replaced by real data from the backend
 const depositTransactions = [
-  { id: 1, amount: 1000, status: "Pending", date: "2023-07-01" },
-  { id: 2, amount: 1500, status: "Accepted", date: "2023-06-28" },
-  { id: 3, amount: 500, status: "Rejected", date: "2023-06-25" },
+  { id: 1, amount: 1000, status: "Pending", date: "2023-07-01" }, // Example transaction
+  { id: 2, amount: 1500, status: "Accepted", date: "2023-06-28" }, // Example transaction
+  { id: 3, amount: 500, status: "Rejected", date: "2023-06-25" }, // Example transaction
 ]
 
+// Backend Integration: Need to fetch the real data from the backend API.
 export default function DepositPage() {
   const [fullName, setFullName] = useState("")
   const [amount, setAmount] = useState("")
@@ -20,13 +22,13 @@ export default function DepositPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // TODO: Integrate with backend API to submit deposit request
+    // TODO: send data to backend api
     console.log("Deposit request:", { fullName, amount, receipt })
-
-    // TODO: Update UI to show pending transaction
-    // TODO: Integrate balance update upon approval
+    // Backend Integration: Handle sending the deposit request to the backend.
+    // Backend Integration: Handle API errors.
+    // Backend Integration: Update UI to show pending transaction after submitting.
+    // Backend Integration: Integrate balance update upon approval by listening to backend events or polling.
   }
-
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Deposit Funds</h1>
@@ -73,6 +75,7 @@ export default function DepositPage() {
                 <TableHead>Date</TableHead>
               </TableRow>
             </TableHeader>
+            {/* Backend Integration: Replace the depositTransactions mock data with the real data */}
             <TableBody>
               {depositTransactions.map((transaction) => (
                 <TableRow key={transaction.id}>

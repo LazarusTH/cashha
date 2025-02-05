@@ -1,13 +1,20 @@
 "use client"
 
+// Backend Integration: This file needs to fetch real data from the backend API.
+// The backend should provide endpoints for:
+// - User's current balance.
+// - Total amount sent by the user.
+// - Total amount received by the user.
+// - Total amount withdrawn by the user.
+// - Transaction history data for the chart.
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Line } from "recharts"
+import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Line } from "recharts"
 import { ArrowUpIcon, ArrowDownIcon, ArrowRightIcon, WalletIcon } from "lucide-react"
 import React from "react"
 import { LineChart } from "recharts"
 
 const data = [
-
   { name: "Jan", sent: 400, received: 300, withdrawn: 200 },
   { name: "Feb", sent: 300, received: 400, withdrawn: 250 },
   { name: "Mar", sent: 200, received: 500, withdrawn: 300 },
@@ -18,10 +25,13 @@ const data = [
 
 
 export default function UserDashboard() {
-  // TODO: Integrate with backend API to fetch real user data
+  // Backend Integration: Fetch currentBalance from backend API
   const currentBalance = 10000
+  // Backend Integration: Fetch totalSent from backend API
   const totalSent = 5000
+  // Backend Integration: Fetch totalReceived from backend API
   const totalReceived = 8000
+  // Backend Integration: Fetch totalWithdrawn from backend API
   const totalWithdrawn = 3000
 
     return (
@@ -29,6 +39,7 @@ export default function UserDashboard() {
       <div className="space-y-6">
         <h1 className="text-3xl font-bold">User Dashboard</h1>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {/* Backend Integration: Fetch data from backend API for metric card values */}
           <MetricCard title="Current Balance" value={`$${currentBalance}`} icon={<WalletIcon className="h-4 w-4" />} />
           <MetricCard title="Total Sent" value={`$${totalSent}`} icon={<ArrowUpIcon className="h-4 w-4" />} />
           <MetricCard title="Total Received" value={`$${totalReceived}`} icon={<ArrowDownIcon className="h-4 w-4" />} />
@@ -43,6 +54,7 @@ export default function UserDashboard() {
             <CardTitle>Transaction History</CardTitle>
           </CardHeader>
           <CardContent className="h-[350px]">
+          {/* Backend Integration: Fetch transaction history data from backend API */}
             <ResponsiveContainer width="100%" height="100%">
             <LineChart data={data} margin={{ top: 20, right: 20, left: 10, bottom: 10 }}>
                 <CartesianGrid stroke="#ccc" strokeDasharray="5 5" />

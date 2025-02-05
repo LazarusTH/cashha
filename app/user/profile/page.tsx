@@ -1,5 +1,7 @@
 "use client"
 
+// Backend Integration: This page needs to fetch user data and update user data from the backend API.
+
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -29,14 +31,14 @@ export default function ProfilePage() {
   const [isEditing, setIsEditing] = useState(false)
 
   useEffect(() => {
-    // TODO: Fetch user data from backend
+    // Backend Integration: Fetch user data from backend API
   }, [])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
     setUser((prevUser) => ({ ...prevUser, [name]: value }))
   }
-
+  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     // TODO: Integrate with backend API to update user profile

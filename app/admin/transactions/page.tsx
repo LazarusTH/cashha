@@ -1,3 +1,5 @@
+// Backend Integration: This entire file needs to be connected to the backend to fetch and manage real transaction data.
+// The backend should provide API endpoints to retrieve, filter, and sort transactions.
 "use client"
 
 import { useState } from "react"
@@ -8,13 +10,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 // Mock transaction data
+// Backend Integration: Remove this mock data and fetch real data from the backend API.
 const mockTransactions = [
   { id: 1, type: "Deposit", amount: 1000, username: "johndoe", status: "Completed", date: "2023-07-05" },
   { id: 2, type: "Withdrawal", amount: 500, username: "janesmith", status: "Pending", date: "2023-07-04" },
   { id: 3, type: "Send", amount: 200, username: "bobjonson", status: "Completed", date: "2023-07-03" },
-  // Add more mock transactions as needed
 ]
 
+// Backend Integration: Replace mockTransactions with data fetched from the backend API.
 export default function TransactionHistory() {
   const [transactions, setTransactions] = useState(mockTransactions)
   const [filter, setFilter] = useState("")
@@ -33,6 +36,7 @@ export default function TransactionHistory() {
     setSortOrder(sortOrder === "asc" ? "desc" : "asc")
   }
 
+  // Backend Integration: Handle filtering and sorting on the backend API side for better performance.
   const filteredAndSortedTransactions = transactions
     .filter(
       (transaction) =>
@@ -90,6 +94,7 @@ export default function TransactionHistory() {
               </TableRow>
             </TableHeader>
             <TableBody>
+              {/* Backend Integration: Populate table rows with data from backend API */}
               {filteredAndSortedTransactions.map((transaction) => (
                 <TableRow key={transaction.id}>
                   <TableCell>{transaction.date}</TableCell>

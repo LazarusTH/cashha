@@ -1,4 +1,6 @@
 "use client"
+// Backend Integration: This entire page needs to be connected to the backend to 
+// fetch and send real transaction data.
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
@@ -7,10 +9,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 
 // Mock data for send transactions
+// Backend Integration: Fetch real transaction data from backend API
 const sendTransactions = [
   { id: 1, amount: 500, recipient: "john@example.com", status: "Completed", date: "2023-07-03" },
-  { id: 2, amount: 750, recipient: "jane@example.com", status: "Pending", date: "2023-07-02" },
-  { id: 3, amount: 300, recipient: "bob@example.com", status: "Failed", date: "2023-07-01" },
+  { id: 2, amount: 750, recipient: "jane@example.com", status: "Pending", date: "2023-07-02" }, { id: 3, amount: 300, recipient: "bob@example.com", status: "Failed", date: "2023-07-01" },
 ]
 
 export default function SendPage() {
@@ -18,17 +20,16 @@ export default function SendPage() {
   const [amount, setAmount] = useState("")
   const [fee, setFee] = useState(0)
 
-  useEffect(() => {
-    // TODO: Replace with actual fee calculation logic
-    setFee(Number.parseFloat(amount) * 0.005)
-  }, [amount])
+  useEffect(() => {    
+    setFee(Number.parseFloat(amount) * 0.005)// Backend Integration: Replace with actual fee calculation logic from backend
+  }, [amount]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // TODO: Integrate with backend API to submit send request
+    // Backend Integration: Send data to backend api
     console.log("Send request:", { recipient, amount, fee })
-
-    // TODO: Update UI to show pending transaction
+      // Backend Integration: handle api errors
+      // Backend Integration: Update UI to show pending transaction
   }
 
   return (
@@ -76,6 +77,7 @@ export default function SendPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
+              {/* Backend Integration: Data should be fetched from the backend */}
               {sendTransactions.map((transaction) => (
                 <TableRow key={transaction.id}>
                   <TableCell>{transaction.amount}</TableCell>

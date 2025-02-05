@@ -1,16 +1,19 @@
 "use client"
+// Backend Integration: This file needs to fetch real data from the backend API.
+// The mock data below needs to be replaced with actual data from the API.
+// Also, the form submission in CreateUserForm needs to send data to the backend API.
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+// Backend Integration: Replace this mock data with actual data from backend API.
 
-// Mock data
+// Mock data: Should be replaced by the data from backend API
 const users = [
   { id: 1, name: "John Doe", email: "john@example.com", status: "Active" },
   { id: 2, name: "Jane Smith", email: "jane@example.com", status: "Pending" },
-  // Add more mock users...
 ]
 
 export default function UsersManagement() {
@@ -43,6 +46,7 @@ export default function UsersManagement() {
             </TableRow>
           </TableHeader>
           <TableBody>
+            {/* Backend Integration: Render data fetched from backend API here. */}
             {users.map((user) => (
               <TableRow key={user.id}>
                 <TableCell>{user.name}</TableCell>
@@ -65,7 +69,7 @@ export default function UsersManagement() {
 function CreateUserForm({ onClose }: { onClose: () => void }) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    // TODO: Implement user creation logic
+    // Backend Integration: Send the new user data to the backend API here.
     onClose()
   }
 

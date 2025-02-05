@@ -1,4 +1,6 @@
 "use client"
+// Backend Integration: This page needs to be integrated with a backend API to fetch real-time chat messages and handle user-support interactions.
+// The backend should provide endpoints to manage chat history, send messages, and handle auto-replies or human agent interactions.
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
@@ -36,8 +38,7 @@ export default function SupportPage() {
     setMessages((prevMessages) => [...prevMessages, userMessage])
     setNewMessage("")
 
-    // TODO: Integrate with backend API for chat functionality
-    // For now, we'll simulate an auto-reply
+    // Backend Integration: Send the user message to the backend and get a reply.
     setTimeout(() => {
       const autoReply: Message = {
         id: messages.length + 2,
@@ -49,7 +50,7 @@ export default function SupportPage() {
     }, 1000)
   }
 
-  // TODO: Replace with actual auto-reply logic based on Cashora data
+  // Backend Integration: Replace the auto-reply logic to use real data from database
   const getAutoReply = (message: string) => {
     if (message.toLowerCase().includes("deposit")) {
       return "To make a deposit, please go to the Deposit page and follow the instructions there. If you have any specific questions about deposits, feel free to ask."
