@@ -1,3 +1,8 @@
+
+"use client"
+
+"use client"
+
 import type React from "react"
 import AdminSidebar from "@/components/admin/AdminSidebar"
 import { usePathname } from "next/navigation"
@@ -19,4 +24,3 @@ export default function AdminLayout({
     </div>
   )
 }
-

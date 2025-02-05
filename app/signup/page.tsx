@@ -1,5 +1,7 @@
 "use client"
 
+
+"use client"
 import { useState } from "react"
 import Link from "next/link"
 import { motion } from "framer-motion"
@@ -9,17 +11,17 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 
 export default function SignUp() {
-  const [formData, setFormData] = useState({
-    firstName: "",
-    lastName: "",
-    username: "",
-    email: "",
-    dateOfBirth: "",
-    placeOfBirth: "",
-    residence: "",
-    nationality: "",
-    idCard: null as File | null,
-  })
+const [formData, setFormData] = useState({
+firstName: "",
+lastName: "",
+username: "",
+email: "",
+dateOfBirth: "",
+placeOfBirth: "",
+residence: "",
+nationality: "",
+idCard: null as File | null,
+})
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLInputElement>) => {
     const { name, value, files } = e.target
@@ -55,39 +57,38 @@ export default function SignUp() {
                   { name: "residence", label: "Residence", type: "text" },
                   { name: "nationality", label: "Nationality", type: "text" },
                 ].map((field) => (
-                  <div key={field.name} className="flex flex-col space-y-1.5">
-                    <Label htmlFor={field.name}>{field.label}</Label>
-                    <Input
-                      id={field.name}
-                      name={field.name}
-                      type={field.type}
-                      value={formData[field.name as keyof typeof formData] as string}
-                      onChange={handleChange}
-                      required
-                    />
-                  </div>
-                ))}
-                <div className="flex flex-col space-y-1.5">
-                  <Label htmlFor="idCard">ID Card Upload</Label>
-                  <Input id="idCard" name="idCard" type="file" onChange={handleChange} required />
-                </div>
-              </div>
-              <Button className="w-full mt-6" type="submit">
-                Sign Up
-              </Button>
-            </form>
-          </CardContent>
-          <CardFooter className="flex flex-col items-center">
-            <p className="text-sm text-gray-500 mb-2">
-              New accounts will be set to "pending" and require admin approval.
-            </p>
-            <Link href="/signin" className="text-sm text-blue-600 hover:underline">
-              Already have an account? Sign in here
-            </Link>
-          </CardFooter>
-        </Card>
-      </motion.div>
-    </div>
-  )
+<div key={field.name} className="flex flex-col space-y-1.5">
+<Label htmlFor={field.name}>{field.label}</Label>
+<Input
+id={field.name}
+name={field.name}
+type={field.type}
+value={formData[field.name as keyof typeof formData] as string}
+onChange={handleChange}
+required
+/>
+</div>
+))}
+<div className="flex flex-col space-y-1.5">
+<Label htmlFor="idCard">ID Card Upload</Label>
+<Input id="idCard" name="idCard" type="file" onChange={handleChange} required />
+</div>
+</div>
+<Button className="w-full mt-6" type="submit">
+Sign Up
+</Button>
+</form>
+</CardContent>
+<CardFooter className="flex flex-col items-center">
+<p className="text-sm text-gray-500 mb-2">
+New accounts will be set to "pending" and require admin approval.
+</p>
+<Link href="/signin" className="text-sm text-blue-600 hover:underline">
+Already have an account? Sign in here
+</Link>
+</CardFooter>
+</Card>
+</motion.div>
+</div>
+)
 }
-
