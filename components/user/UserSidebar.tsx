@@ -42,10 +42,10 @@ export default function UserSidebar() {
         {isOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
       </Button>
       <aside
-        className={`bg-gray-800 text-white w-[280px] min-h-screen fixed md:sticky top-0 left-0 z-40 transition-transform duration-300 ease-in-out ${
+        className={`bg-gray-900 text-white w-[280px] min-h-screen fixed md:sticky top-0 left-0 z-40 transition-transform duration-300 ease-in-out ${
           isOpen ? "translate-x-0" : "-translate-x-full"
         } md:translate-x-0`}
-      >
+      > 
         <ScrollArea className="h-full">
           <nav className="space-y-2 p-4 mt-16 md:mt-0">
             {navItems.map((item) => (
@@ -53,11 +53,11 @@ export default function UserSidebar() {
                 key={item.name}
                 href={item.href}
                 className={`flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-700 transition-colors ${
-                  pathname === item.href ? "bg-gray-700" : ""
-                }`}
+                  pathname === item.href ? "bg-gray-800" : ""
+                } text-lg`}
                 onClick={() => setIsOpen(false)}
               >
-                <item.icon className="h-5 w-5" />
+                <item.icon className="h-5 w-5" /> 
                 <span>{item.name}</span>
               </Link>
             ))}
