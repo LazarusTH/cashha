@@ -2,6 +2,7 @@ import "./globals.css"
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import { ThemeProvider } from "@/components/theme-provider"
+import { AuthProvider } from '@/lib/supabase/auth-context'
 import type React from "react"
 
 const inter = Inter({ subsets: ["latin"] })
@@ -20,10 +21,11 @@ export default function RootLayout({
     <html lang="en" className="dark">
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-          {children}
+          <AuthProvider>
+            {children}
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>
   )
 }
-

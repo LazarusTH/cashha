@@ -1,96 +1,180 @@
 "use client"
 
-// Backend Integration: This file needs to fetch real data from the backend API.
-// The backend should provide endpoints for:
-// - User's current balance.
-// - Total amount sent by the user.
-// - Total amount received by the user.
-// - Total amount withdrawn by the user.
-// - Transaction history data for the chart.
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Line } from "recharts"
+import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Line, LineChart } from "recharts"
 import { ArrowUpIcon, ArrowDownIcon, ArrowRightIcon, WalletIcon } from "lucide-react"
-import React from "react"
-import { LineChart } from "recharts"
+import { useDashboardData } from "@/lib/hooks/use-dashboard-data"
+import { useTransactionSubscription } from "@/lib/hooks/use-transaction-subscription"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
-const data = [
-  { name: "Jan", sent: 400, received: 300, withdrawn: 200 },
-  { name: "Feb", sent: 300, received: 400, withdrawn: 250 },
-  { name: "Mar", sent: 200, received: 500, withdrawn: 300 },
-  { name: "Apr", sent: 278, received: 390, withdrawn: 280 },
-  { name: "May", sent: 189, received: 480, withdrawn: 270 },
-  { name: "Jun", sent: 239, received: 380, withdrawn: 290 },
-]
+interface MetricCardProps {
+  title: string
+  value: string
+  icon: React.ReactNode
+  loading?: boolean
+}
 
+function MetricCard({ title, value, icon, loading }: MetricCardProps) {
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium">{title}</CardTitle>
+        {icon}
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <Skeleton className="h-7 w-[100px]" />
+        ) : (
+          <div className="text-2xl font-bold">{value}</div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
 
 export default function UserDashboard() {
-  // Backend Integration: Fetch currentBalance from backend API
-  const currentBalance = 10000
-  // Backend Integration: Fetch totalSent from backend API
-  const totalSent = 5000
-  // Backend Integration: Fetch totalReceived from backend API
-  const totalReceived = 8000
-  // Backend Integration: Fetch totalWithdrawn from backend API
-  const totalWithdrawn = 3000
+  const { data, loading, error, refetch } = useDashboardData()
+  
+  // Subscribe to transaction updates
+  useTransactionSubscription(() => {
+    refetch()
+  })
 
+  if (error) {
     return (
+      <Alert variant="destructive">
+        <AlertTitle>Error</AlertTitle>
+        <AlertDescription>
+          Failed to load dashboard data. Please try again later.
+        </AlertDescription>
+      </Alert>
+    )
+  }
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      maximumFractionDigits: 0,
+    }).format(value)
+  }
+
+  return (
     <div className="container max-w-7xl mx-auto px-4 py-6">
       <div className="space-y-6">
-        <h1 className="text-3xl font-bold">User Dashboard</h1>
+        <h1 className="text-3xl font-bold">Dashboard</h1>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {/* Backend Integration: Fetch data from backend API for metric card values */}
-          <MetricCard title="Current Balance" value={`$${currentBalance}`} icon={<WalletIcon className="h-4 w-4" />} />
-          <MetricCard title="Total Sent" value={`$${totalSent}`} icon={<ArrowUpIcon className="h-4 w-4" />} />
-          <MetricCard title="Total Received" value={`$${totalReceived}`} icon={<ArrowDownIcon className="h-4 w-4" />} />
+          <MetricCard
+            title="Current Balance"
+            value={loading ? "Loading..." : formatCurrency(data?.currentBalance || 0)}
+            icon={<WalletIcon className="h-4 w-4" />}
+            loading={loading}
+          />
+          <MetricCard
+            title="Total Sent"
+            value={loading ? "Loading..." : formatCurrency(data?.totalSent || 0)}
+            icon={<ArrowUpIcon className="h-4 w-4" />}
+            loading={loading}
+          />
+          <MetricCard
+            title="Total Received"
+            value={loading ? "Loading..." : formatCurrency(data?.totalReceived || 0)}
+            icon={<ArrowDownIcon className="h-4 w-4" />}
+            loading={loading}
+          />
           <MetricCard
             title="Total Withdrawn"
-            value={`$${totalWithdrawn}`}
+            value={loading ? "Loading..." : formatCurrency(data?.totalWithdrawn || 0)}
             icon={<ArrowRightIcon className="h-4 w-4" />}
+            loading={loading}
           />
         </div>
+
         <Card>
-          <CardHeader className="pb-4">
+          <CardHeader>
             <CardTitle>Transaction History</CardTitle>
           </CardHeader>
-          <CardContent className="h-[350px]">
-          {/* Backend Integration: Fetch transaction history data from backend API */}
-            <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data} margin={{ top: 20, right: 20, left: 10, bottom: 10 }}>
-                <CartesianGrid stroke="#ccc" strokeDasharray="5 5" />
-                <XAxis dataKey="name" />
+          <CardContent>
+            {loading ? (
+              <Skeleton className="h-[300px] w-full" />
+            ) : (
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={data?.monthlyStats || []}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
                   <YAxis />
-                  <Tooltip  />
-                  <Legend  />
-                   <Line type="monotone" dataKey="sent" stroke="#0000FF" strokeWidth={3} dot={false} activeDot={true}  strokeDasharray="5 5"
-                       />
-                  <Line type="monotone" dataKey="received" stroke="#008000" strokeWidth={3} dot={false} activeDot={true}  strokeDasharray="5 5"
-                       />
-                     <Line type="monotone" dataKey="withdrawn" stroke="#FFFF00" strokeWidth={3} dot={false} activeDot={true}  strokeDasharray="5 5"
-                       />
+                  <Tooltip formatter={(value) => formatCurrency(value as number)} />
+                  <Legend />
+                  <Line
+                    type="monotone"
+                    dataKey="sent"
+                    stroke="#ef4444"
+                    name="Sent"
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="received"
+                    stroke="#22c55e"
+                    name="Received"
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="withdrawn"
+                    stroke="#3b82f6"
+                    name="Withdrawn"
+                  />
                 </LineChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
 
-
-            </ResponsiveContainer>
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent Transactions</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <div className="space-y-2">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <Skeleton key={i} className="h-12 w-full" />
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {data?.recentTransactions.map((transaction) => (
+                  <div
+                    key={transaction.id}
+                    className="flex items-center justify-between border-b pb-2"
+                  >
+                    <div>
+                      <div className="font-medium">
+                        {transaction.type.charAt(0).toUpperCase() + transaction.type.slice(1)}
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        {new Date(transaction.created_at).toLocaleDateString()}
+                      </div>
+                    </div>
+                    <div className={`font-medium ${
+                      transaction.type === 'withdraw' || 
+                      (transaction.type === 'send' && !transaction.recipient_id)
+                        ? 'text-red-500'
+                        : 'text-green-500'
+                    }`}>
+                      {transaction.type === 'withdraw' || 
+                       (transaction.type === 'send' && !transaction.recipient_id)
+                        ? '-'
+                        : '+'}
+                      {formatCurrency(transaction.amount)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
     </div>
   )
 }
-
-function MetricCard({ title, value, icon }: { title: string; value: string; icon: React.ReactNode }) {
-  
-  return (
-    <Card className="m-4">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-base font-medium text-gray-500">{title}</CardTitle>
-        {React.cloneElement(icon as any, { className: `h-4 w-4 text-blue-500` })}
-      </CardHeader>
-      <CardContent className="p-4">
-        <div className="text-3xl font-semibold">{value}</div>
-      </CardContent>
-    </Card>
-  )
-}
-

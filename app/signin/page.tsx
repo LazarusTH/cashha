@@ -8,21 +8,52 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { signIn } from "@/lib/supabase/client"
+import { useFormValidation } from "@/lib/hooks/use-form-validation"
+import { toast } from "@/components/ui/use-toast"
 
 export default function SignIn() {
-  const [username, setUsername] = useState("")
+  const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [loading, setLoading] = useState(false)
   const router = useRouter()
-  // TODO: Add input validation
+  const { errors, validateEmail, validatePassword, clearErrors } = useFormValidation()
 
-  const handleSubmit = (e: React.FormEvent) => {
-    // TODO: send username and password to backend
-    // TODO: handle api errors
-    // TODO: Implement authentication logic
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // TODO: Integrate authentication API call
-    console.log("Sign in with:", { username, password })
-    router.push("/user/dashboard")
+    clearErrors()
+
+    // Validate inputs
+    const isEmailValid = validateEmail(email)
+    const isPasswordValid = validatePassword(password)
+    
+    if (!isEmailValid || !isPasswordValid) {
+      return
+    }
+
+    setLoading(true)
+    try {
+      const { data, error } = await signIn(email, password)
+      if (error) throw error
+
+      toast({
+        title: "Success",
+        description: "Successfully signed in!",
+      })
+
+      // Redirect based on user role
+      const role = data.user?.user_metadata?.role || 'user'
+      router.push(role === 'admin' ? '/admin/dashboard' : '/user/dashboard')
+    } catch (error) {
+      console.error('Sign in error:', error)
+      toast({
+        title: "Error",
+        description: "Invalid email or password",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -36,13 +67,15 @@ export default function SignIn() {
             <form onSubmit={handleSubmit}>
               <div className="grid w-full items-center gap-4">
                 <div className="flex flex-col space-y-1.5">
-                  <Label htmlFor="username">Username</Label>
+                  <Label htmlFor="email">Email</Label>
                   <Input
-                    id="username"
-                    placeholder="Enter your username"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
+                    id="email"
+                    type="email"
+                    placeholder="Enter your email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                   />
+                  {errors.email && <p className="text-sm text-red-500">{errors.email}</p>}
                 </div>
                 <div className="flex flex-col space-y-1.5">
                   <Label htmlFor="password">Password</Label>
@@ -53,17 +86,21 @@ export default function SignIn() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                   />
+                  {errors.password && <p className="text-sm text-red-500">{errors.password}</p>}
                 </div>
+                <Button type="submit" disabled={loading}>
+                  {loading ? "Signing in..." : "Sign In"}
+                </Button>
               </div>
-              <Button className="w-full mt-4" type="submit">
-                Sign In
-              </Button>
             </form>
           </CardContent>
-          <CardFooter className="flex justify-center">
-            <Link href="/signup" className="text-sm text-blue-600 hover:underline">
-              Don&apos;t have an account? Sign up here
-            </Link>
+          <CardFooter className="flex flex-col space-y-2">
+            <div className="text-sm text-center">
+              Don&apos;t have an account?{" "}
+              <Link href="/signup" className="text-blue-500 hover:underline">
+                Sign up
+              </Link>
+            </div>
           </CardFooter>
         </Card>
       </motion.div>

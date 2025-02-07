@@ -1,43 +1,46 @@
-// Backend Integration: This page needs to fetch real transaction data from the backend API.
-// Please set up an API endpoint to retrieve transaction data and replace the mock data.
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-
-// Mock data for transactions (Replace this with real data from the backend)
-const mockTransactions = [
-  { id: 1, type: "Deposit", amount: 1000, status: "Completed", date: "2023-07-05", details: "Bank transfer" },
-  { id: 2, type: "Withdrawal", amount: -500, status: "Pending", date: "2023-07-04", details: "ATM withdrawal" },
-  { id: 3, type: "Send", amount: -200, status: "Completed", date: "2023-07-03", details: "To: john@example.com" },
-  { id: 4, type: "Receive", amount: 300, status: "Completed", date: "2023-07-02", details: "From: jane@example.com" },
-  { id: 5, type: "Deposit", amount: 1500, status: "Completed", date: "2023-07-01", details: "Cash deposit" },
-]
+import { useAuth } from "@/lib/supabase/auth-context"
+import { getUserTransactions } from "@/lib/supabase/transactions"
+import { Skeleton } from "@/components/ui/skeleton"
+import { toast } from "@/components/ui/use-toast"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 export default function TransactionHistoryPage() {
-  const [transactions, setTransactions] = useState(mockTransactions) // Backend Integration: Replace mockTransactions with data from backend API
+  const { user } = useAuth()
+  const [transactions, setTransactions] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState("")
-  // Backend Integration: Get Sort from backend API
   const [sortBy, setSortBy] = useState("date")
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc")
 
-  // TODO: Fetch transactions from backend API
-  // useEffect(() => {
-  //   const fetchTransactions = async () => {
-  //     try {
-  //       const response = await fetch('/api/transactions')
-  //       const data = await response.json()
-  //       setTransactions(data)
-  //     } catch (error) {
-  //       console.error('Error fetching transactions:', error)
-  //     }
-  //   }
-  //   fetchTransactions()
-  // }, [])
+  useEffect(() => {
+    if (!user) return
+
+    async function loadTransactions() {
+      try {
+        const data = await getUserTransactions(user.id, 100)
+        setTransactions(data)
+      } catch (error) {
+        console.error('Error loading transactions:', error)
+        toast({
+          title: "Error",
+          description: "Failed to load transaction history",
+          variant: "destructive",
+        })
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadTransactions()
+  }, [user])
 
   const handleFilterChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFilter(e.target.value.toLowerCase())
@@ -51,79 +54,154 @@ export default function TransactionHistoryPage() {
     setSortOrder(sortOrder === "asc" ? "desc" : "asc")
   }
 
-  const filteredAndSortedTransactions = transactions
-    .filter(
-      (transaction) =>
-        transaction.type.toLowerCase().includes(filter) ||
-        transaction.status.toLowerCase().includes(filter) ||
-        transaction.details.toLowerCase().includes(filter),
-    )
-    .sort((a, b) => {
-      if (a[sortBy as keyof typeof a] < b[sortBy as keyof typeof b]) return sortOrder === "asc" ? -1 : 1
-      if (a[sortBy as keyof typeof a] > b[sortBy as keyof typeof b]) return sortOrder === "asc" ? 1 : -1
-      return 0
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      maximumFractionDigits: 0,
+    }).format(value)
+  }
+
+  const getStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'completed':
+        return 'text-green-500'
+      case 'failed':
+        return 'text-red-500'
+      default:
+        return 'text-yellow-500'
+    }
+  }
+
+  const getTransactionDetails = (transaction: any) => {
+    switch (transaction.type) {
+      case 'send':
+        return `To: ${transaction.recipient?.email || 'Unknown'}`
+      case 'deposit':
+        return transaction.metadata?.method || 'Bank transfer'
+      case 'withdraw':
+        return transaction.metadata?.bank_name ? `${transaction.metadata.bank_name} - ${transaction.metadata.account_number}` : 'Bank withdrawal'
+      default:
+        return ''
+    }
+  }
+
+  const filteredTransactions = transactions
+    .filter((transaction) => {
+      const searchString = filter.toLowerCase()
+      return (
+        transaction.type.toLowerCase().includes(searchString) ||
+        transaction.status.toLowerCase().includes(searchString) ||
+        getTransactionDetails(transaction).toLowerCase().includes(searchString)
+      )
     })
+    .sort((a, b) => {
+      let comparison = 0
+      switch (sortBy) {
+        case 'amount':
+          comparison = a.amount - b.amount
+          break
+        case 'type':
+          comparison = a.type.localeCompare(b.type)
+          break
+        case 'status':
+          comparison = a.status.localeCompare(b.status)
+          break
+        default: // date
+          comparison = new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      }
+      return sortOrder === 'asc' ? comparison : -comparison
+    })
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <Skeleton className="h-8 w-[200px]" />
+          <Skeleton className="h-10 w-[300px]" />
+        </div>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="space-y-2">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} className="h-12 w-full" />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Transaction History</h1>
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold">Transaction History</h1>
+        <div className="flex items-center space-x-2">
+          <Input
+            placeholder="Filter transactions..."
+            value={filter}
+            onChange={handleFilterChange}
+            className="w-[300px]"
+          />
+          <Select value={sortBy} onValueChange={handleSortChange}>
+            <SelectTrigger className="w-[150px]">
+              <SelectValue placeholder="Sort by" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="date">Date</SelectItem>
+              <SelectItem value="amount">Amount</SelectItem>
+              <SelectItem value="type">Type</SelectItem>
+              <SelectItem value="status">Status</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button variant="outline" onClick={toggleSortOrder}>
+            {sortOrder === "asc" ? "↑" : "↓"}
+          </Button>
+        </div>
+      </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>All Transactions</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex justify-between mb-4">
-            <Input
-              placeholder="Filter transactions..."
-              value={filter}
-              onChange={handleFilterChange}
-              className="max-w-sm"
-            />
-            <div className="flex items-center space-x-2">
-              <Select onValueChange={handleSortChange} defaultValue={sortBy}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Sort by" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="date">Date</SelectItem>
-                  <SelectItem value="amount">Amount</SelectItem>
-                  <SelectItem value="type">Type</SelectItem>
-                  <SelectItem value="status">Status</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button onClick={toggleSortOrder} variant="outline">
-                {sortOrder === "asc" ? "↑" : "↓"}
-              </Button>
-            </div>
-          </div>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Amount (ETB)</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Details</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredAndSortedTransactions.map((transaction) => (
-                <TableRow key={transaction.id}>
-                  <TableCell>{transaction.date}</TableCell>
-                  <TableCell>{transaction.type}</TableCell>
-                  <TableCell className={transaction.amount >= 0 ? "text-green-600" : "text-red-600"}>
-                    {transaction.amount >= 0 ? "+" : ""}
-                    {transaction.amount}
-                  </TableCell>
-                  <TableCell>{transaction.status}</TableCell>
-                  <TableCell>{transaction.details}</TableCell>
+        <CardContent className="pt-6">
+          {filteredTransactions.length === 0 ? (
+            <Alert>
+              <AlertDescription>
+                No transactions found.
+              </AlertDescription>
+            </Alert>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Amount</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Details</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-          {filteredAndSortedTransactions.length === 0 && (
-            <p className="text-center text-gray-500 mt-4">No transactions found.</p>
+              </TableHeader>
+              <TableBody>
+                {filteredTransactions.map((transaction) => (
+                  <TableRow key={transaction.id}>
+                    <TableCell>
+                      {new Date(transaction.created_at).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell className="capitalize">
+                      {transaction.type}
+                    </TableCell>
+                    <TableCell>
+                      {formatCurrency(transaction.amount)}
+                    </TableCell>
+                    <TableCell>
+                      <span className={getStatusColor(transaction.status)}>
+                        {transaction.status.charAt(0).toUpperCase() + transaction.status.slice(1)}
+                      </span>
+                    </TableCell>
+                    <TableCell>{getTransactionDetails(transaction)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           )}
         </CardContent>
       </Card>

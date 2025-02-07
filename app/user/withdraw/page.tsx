@@ -1,6 +1,4 @@
 "use client"
-// Backend Integration: This entire page needs to be integrated with the backend API.
-// Need to fetch and send withdrawal requests and transactions data to the backend.
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
@@ -8,139 +6,234 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { useWithdraw } from "@/lib/hooks/use-withdraw"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Textarea } from "@/components/ui/textarea"
 
+// List of supported banks
+const SUPPORTED_BANKS = [
+  "Commercial Bank of Ethiopia",
+  "Dashen Bank",
+  "Awash Bank",
+  "Abyssinia Bank",
+  "Nib International Bank",
+  "United Bank",
+  "Wegagen Bank",
+  "Zemen Bank",
+  "Oromia International Bank",
+  "Cooperative Bank of Oromia",
+]
 
 export default function WithdrawPage() {
-
-
-// Mock data for withdrawal transactions
-// Backend Integration: Fetch real data from backend API
-const withdrawalTransactions = [
-  { id: 1, amount: 800, status: "Completed", date: "2023-07-02" },
-  { id: 2, amount: 1200, status: "Pending", date: "2023-07-01" },
-  { id: 3, amount: 500, status: "Rejected", date: "2023-06-30" },
-]
-
-// Backend Integration: Fetch banks from backend API
-const banks = [
-  { id: 1, name: "Bank A" },
-  { id: 2, name: "Bank B" },
-  { id: 3, name: "Bank C" },
-]
-
-
-
   const [amount, setAmount] = useState("")
-  const [bank, setBank] = useState("")
+  const [bankName, setBankName] = useState("")
   const [accountNumber, setAccountNumber] = useState("")
-  const [accountHolderName, setAccountHolderName] = useState("")
-  const [fee, setFee] = useState(0)
+  const [accountName, setAccountName] = useState("")
+  const [description, setDescription] = useState("")
+  
+  const { submitWithdrawal, loading, history, historyLoading, fetchHistory } = useWithdraw()
 
   useEffect(() => {
-    // Backend Integration: Replace with actual fee calculation logic from backend API
-    setFee(Number.parseFloat(amount) * 0.01)
-  }, [amount])
+    fetchHistory()
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // Backend Integration: Send withdrawal request data to backend API
-    // Backend Integration: Integrate with backend API to submit withdrawal request
-    console.log("Withdrawal request:", { amount, bank, accountNumber, accountHolderName, fee })
-     // TODO: Handle api errors
 
-    // TODO: Update UI to show pending transaction
+    if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
+      return
+    }
+
+    const success = await submitWithdrawal({
+      amount: Number(amount),
+      bankName,
+      accountNumber,
+      accountName,
+      description,
+    })
+
+    if (success) {
+      setAmount("")
+      setBankName("")
+      setAccountNumber("")
+      setAccountName("")
+      setDescription("")
+    }
+  }
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+    }).format(value)
+  }
+
+  const getStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'completed':
+        return 'text-green-500'
+      case 'failed':
+        return 'text-red-500'
+      default:
+        return 'text-yellow-500'
+    }
   }
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Withdraw Funds</h1>
+    <div className="container max-w-4xl mx-auto px-4 py-6">
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold">Withdraw Money</h1>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Request Withdrawal</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label htmlFor="amount" className="block text-sm font-medium text-gray-700">
-                Amount (ETB)
-              </label>
-              <Input id="amount" type="number" value={amount} onChange={(e) => setAmount(e.target.value)} required />
-            </div>
-            <div>
-              <label htmlFor="bank" className="block text-sm font-medium text-gray-700">
-                Bank
-              </label>
-              <Select onValueChange={setBank} required>
-                <SelectTrigger id="bank">
-                  <SelectValue placeholder="Select a bank" />
-                </SelectTrigger>
-                <SelectContent>
-                  {banks.map((bank) => (
-                    <SelectItem key={bank.id} value={bank.name}>
-                      {bank.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <label htmlFor="accountNumber" className="block text-sm font-medium text-gray-700">
-                Account Number
-              </label>
-              <Input
-                id="accountNumber"
-                value={accountNumber}
-                onChange={(e) => setAccountNumber(e.target.value)}
-                required
-              />
-            </div>
-            <div>
-              <label htmlFor="accountHolderName" className="block text-sm font-medium text-gray-700">
-                Account Holder's Name
-              </label>
-              <Input
-                id="accountHolderName"
-                value={accountHolderName}
-                onChange={(e) => setAccountHolderName(e.target.value)}
-                required
-              />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-gray-700">Fee: {fee.toFixed(2)} ETB</p>
-            </div>
-            <Button type="submit">Submit Withdrawal Request</Button>
-             {/* Backend Integration: Handle api errors from form */}
-          </form>
-        </CardContent>
-      </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Request Withdrawal</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label htmlFor="amount" className="block text-sm font-medium mb-1">
+                  Amount
+                </label>
+                <Input
+                  id="amount"
+                  type="number"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder="Enter amount to withdraw"
+                  min="0"
+                  step="0.01"
+                  required
+                  disabled={loading}
+                />
+              </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Withdrawal Transactions</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Amount (ETB)</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Date</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {withdrawalTransactions.map((transaction) => (
-                <TableRow key={transaction.id}>
-                  <TableCell>{transaction.amount}</TableCell>
-                  <TableCell>{transaction.status}</TableCell>
-                  <TableCell>{transaction.date}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+              <div>
+                <label htmlFor="bank" className="block text-sm font-medium mb-1">
+                  Bank
+                </label>
+                <Select
+                  value={bankName}
+                  onValueChange={setBankName}
+                  disabled={loading}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select your bank" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SUPPORTED_BANKS.map((bank) => (
+                      <SelectItem key={bank} value={bank}>
+                        {bank}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <label htmlFor="accountNumber" className="block text-sm font-medium mb-1">
+                  Account Number
+                </label>
+                <Input
+                  id="accountNumber"
+                  value={accountNumber}
+                  onChange={(e) => setAccountNumber(e.target.value)}
+                  placeholder="Enter your bank account number"
+                  required
+                  disabled={loading}
+                />
+              </div>
+
+              <div>
+                <label htmlFor="accountName" className="block text-sm font-medium mb-1">
+                  Account Holder Name
+                </label>
+                <Input
+                  id="accountName"
+                  value={accountName}
+                  onChange={(e) => setAccountName(e.target.value)}
+                  placeholder="Enter account holder's name"
+                  required
+                  disabled={loading}
+                />
+              </div>
+
+              <div>
+                <label htmlFor="description" className="block text-sm font-medium mb-1">
+                  Description (Optional)
+                </label>
+                <Textarea
+                  id="description"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Enter a description for this withdrawal"
+                  disabled={loading}
+                />
+              </div>
+
+              <Button
+                type="submit"
+                disabled={loading || !bankName}
+                className="w-full"
+              >
+                {loading ? "Processing..." : "Submit Withdrawal Request"}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Withdrawal History</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {historyLoading ? (
+              <div className="space-y-2">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <Skeleton key={i} className="h-12 w-full" />
+                ))}
+              </div>
+            ) : history.length === 0 ? (
+              <Alert>
+                <AlertDescription>
+                  No withdrawal history found.
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <div className="relative overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Bank</TableHead>
+                      <TableHead>Account</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {history.map((transaction) => (
+                      <TableRow key={transaction.id}>
+                        <TableCell>
+                          {new Date(transaction.created_at).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell>{formatCurrency(transaction.amount)}</TableCell>
+                        <TableCell>{transaction.metadata.bankName}</TableCell>
+                        <TableCell>{transaction.metadata.accountNumber}</TableCell>
+                        <TableCell>
+                          <span className={getStatusColor(transaction.status)}>
+                            {transaction.status.charAt(0).toUpperCase() + transaction.status.slice(1)}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }
-
