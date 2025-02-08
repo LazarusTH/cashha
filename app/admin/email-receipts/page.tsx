@@ -1,7 +1,7 @@
 "use client"
-// Backend Integration: This file needs to be integrated with the backend to fetch real user data and handle email sending.
+// Backend Integration: This page is integrated with the backend API to manage email receipts.
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -9,21 +9,49 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { useToast } from "@/components/ui/use-toast"
 
-// Mock users data - replace with actual data fetching from backend
-const mockUsers = [
-  { id: 1, username: "johndoe", email: "john@example.com" },
-  { id: 2, username: "janesmith", email: "jane@example.com" },
-  { id: 3, username: "bobjonson", email: "bob@example.com" },
-]
+interface User {
+  id: number
+  username: string
+  email: string
+  last_receipt_sent?: string
+}
 
 export default function EmailReceiptModule() {
-  // Backend Integration: Replace mockUsers with actual data fetching from an API endpoint.
-  const [users, setUsers] = useState(mockUsers);
-  
+  const [users, setUsers] = useState<User[]>([])
   const [selectedUsers, setSelectedUsers] = useState<number[]>([])
   const [subject, setSubject] = useState("")
   const [message, setMessage] = useState("")
+  const [loading, setLoading] = useState(true)
+  const [sending, setSending] = useState(false)
+  const { toast } = useToast()
+
+  useEffect(() => {
+    fetchUsers()
+  }, [])
+
+  const fetchUsers = async () => {
+    try {
+      const response = await fetch('/api/admin/users')
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch users')
+      }
+
+      setUsers(data.users)
+    } catch (error) {
+      console.error('Error fetching users:', error)
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to fetch users',
+        variant: 'destructive',
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleSelectAll = () => {
     if (selectedUsers.length === users.length) {
@@ -41,15 +69,61 @@ export default function EmailReceiptModule() {
     }
   }
 
-  const handleSendEmails = () => {
-    // Backend Integration: Integrate with backend API to send emails to selected users
-    console.log("Sending emails to:", selectedUsers)
-    console.log("Subject:", subject)
-    console.log("Message:", message)
-    // Reset form
-    setSelectedUsers([])
-    setSubject("")
-    setMessage("")
+  const handleSendEmails = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (selectedUsers.length === 0) {
+      toast({
+        title: 'Error',
+        description: 'Please select at least one recipient',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    setSending(true)
+    try {
+      const response = await fetch('/api/admin/email/send-receipts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          user_ids: selectedUsers,
+          subject,
+          message,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to send receipts')
+      }
+
+      toast({
+        title: 'Success',
+        description: 'Receipts sent successfully',
+      })
+
+      // Reset form and refresh user list to update last_receipt_sent
+      setSelectedUsers([])
+      setSubject('')
+      setMessage('')
+      fetchUsers()
+    } catch (error) {
+      console.error('Error sending receipts:', error)
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to send receipts',
+        variant: 'destructive',
+      })
+    } finally {
+      setSending(false)
+    }
+  }
+
+  if (loading) {
+    return <div>Loading users...</div>
   }
 
   return (
@@ -77,11 +151,11 @@ export default function EmailReceiptModule() {
                 <TableHead className="w-[100px]">Select</TableHead>
                 <TableHead>Username</TableHead>
                 <TableHead>Email</TableHead>
+                <TableHead>Last Receipt Sent</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {users.map((user) => (
-                 // Backend Integration: User data should be mapped based on the API response format.
                 <TableRow key={user.id}>
                   <TableCell>
                     <Checkbox
@@ -92,6 +166,12 @@ export default function EmailReceiptModule() {
                   </TableCell>
                   <TableCell>{user.username}</TableCell>
                   <TableCell>{user.email}</TableCell>
+                  <TableCell>
+                    {user.last_receipt_sent 
+                      ? new Date(user.last_receipt_sent).toLocaleString()
+                      : 'Never'
+                    }
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -101,26 +181,33 @@ export default function EmailReceiptModule() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Compose Email</CardTitle>
+          <CardTitle>Compose Receipt Email</CardTitle>
         </CardHeader>
         <CardContent>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault()
-              handleSendEmails()
-            }}
-            className="space-y-4"
-          >
+          <form onSubmit={handleSendEmails} className="space-y-4">
             <div>
               <Label htmlFor="subject">Subject</Label>
-              <Input id="subject" value={subject} onChange={(e) => setSubject(e.target.value)} required />
+              <Input
+                id="subject"
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                required
+                disabled={sending}
+              />
             </div>
             <div>
               <Label htmlFor="message">Message</Label>
-              <Textarea id="message" value={message} onChange={(e) => setMessage(e.target.value)} required />
+              <Textarea
+                id="message"
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                required
+                className="min-h-[200px]"
+                disabled={sending}
+              />
             </div>
-            <Button type="submit" disabled={selectedUsers.length === 0}>
-              Send Emails
+            <Button type="submit" disabled={selectedUsers.length === 0 || sending}>
+              {sending ? 'Sending...' : 'Send Receipt Emails'}
             </Button>
           </form>
         </CardContent>

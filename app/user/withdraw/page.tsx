@@ -10,6 +10,7 @@ import { useWithdraw } from "@/lib/hooks/use-withdraw"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Textarea } from "@/components/ui/textarea"
+import toast from "@/lib/toast"
 
 // List of supported banks
 const SUPPORTED_BANKS = [
@@ -31,12 +32,60 @@ export default function WithdrawPage() {
   const [accountNumber, setAccountNumber] = useState("")
   const [accountName, setAccountName] = useState("")
   const [description, setDescription] = useState("")
-  
+  const [withdrawalLimits, setWithdrawalLimits] = useState({
+    dailyLimit: 0,
+    dailyUsed: 0,
+    monthlyLimit: 0,
+    monthlyUsed: 0,
+    minAmount: 0,
+    maxAmount: 0,
+  })
+
   const { submitWithdrawal, loading, history, historyLoading, fetchHistory } = useWithdraw()
 
   useEffect(() => {
     fetchHistory()
+    fetchWithdrawalLimits()
   }, [])
+
+  const fetchWithdrawalLimits = async () => {
+    try {
+      const response = await fetch('/api/user/withdrawal-limits')
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch withdrawal limits')
+      }
+      setWithdrawalLimits(data)
+    } catch (error) {
+      console.error('Error fetching withdrawal limits:', error)
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to fetch withdrawal limits',
+        variant: 'destructive',
+      })
+    }
+  }
+
+  const validateWithdrawal = (amount: number) => {
+    if (amount < withdrawalLimits.minAmount) {
+      throw new Error(`Minimum withdrawal amount is ${formatCurrency(withdrawalLimits.minAmount)}`)
+    }
+
+    if (amount > withdrawalLimits.maxAmount) {
+      throw new Error(`Maximum withdrawal amount is ${formatCurrency(withdrawalLimits.maxAmount)}`)
+    }
+
+    const remainingDaily = withdrawalLimits.dailyLimit - withdrawalLimits.dailyUsed
+    const remainingMonthly = withdrawalLimits.monthlyLimit - withdrawalLimits.monthlyUsed
+
+    if (amount > remainingDaily) {
+      throw new Error(`Amount exceeds daily remaining limit of ${formatCurrency(remainingDaily)}`)
+    }
+
+    if (amount > remainingMonthly) {
+      throw new Error(`Amount exceeds monthly remaining limit of ${formatCurrency(remainingMonthly)}`)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -45,20 +94,47 @@ export default function WithdrawPage() {
       return
     }
 
-    const success = await submitWithdrawal({
-      amount: Number(amount),
-      bankName,
-      accountNumber,
-      accountName,
-      description,
-    })
+    try {
+      validateWithdrawal(Number(amount))
 
-    if (success) {
-      setAmount("")
-      setBankName("")
-      setAccountNumber("")
-      setAccountName("")
-      setDescription("")
+      // Verify bank account before submitting withdrawal
+      const verifyResponse = await fetch('/api/bank/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bankName,
+          accountNumber,
+          accountName,
+        }),
+      })
+
+      if (!verifyResponse.ok) {
+        const error = await verifyResponse.json()
+        throw new Error(error.message || 'Failed to verify bank account')
+      }
+
+      const success = await submitWithdrawal({
+        amount: Number(amount),
+        bankName,
+        accountNumber,
+        accountName,
+        description,
+      })
+
+      if (success) {
+        setAmount("")
+        setBankName("")
+        setAccountNumber("")
+        setAccountName("")
+        setDescription("")
+        fetchWithdrawalLimits() // Refresh limits after successful withdrawal
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to submit withdrawal',
+        variant: 'destructive',
+      })
     }
   }
 

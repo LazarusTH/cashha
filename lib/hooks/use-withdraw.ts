@@ -2,8 +2,7 @@
 
 import { useState } from 'react'
 import { useAuth } from '@/lib/supabase/auth-context'
-import { createWithdrawRequest, getUserWithdrawHistory } from '@/lib/supabase/withdraw'
-import { toast } from '@/components/ui/use-toast'
+import toast from '@/lib/toast'
 
 export interface WithdrawFormData {
   amount: number
@@ -31,14 +30,18 @@ export function useWithdraw() {
 
     setLoading(true)
     try {
-      await createWithdrawRequest({
-        userId: user.id,
-        amount: data.amount,
-        bankName: data.bankName,
-        accountNumber: data.accountNumber,
-        accountName: data.accountName,
-        description: data.description,
+      const response = await fetch('/api/user/withdrawals', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
       })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.message || 'Failed to submit withdrawal')
+      }
 
       toast({
         title: "Success",
@@ -48,11 +51,11 @@ export function useWithdraw() {
       // Refresh history
       fetchHistory()
       return true
-    } catch (error: any) {
+    } catch (error) {
       console.error('Withdrawal error:', error)
       toast({
         title: "Error",
-        description: error.message || "Failed to submit withdrawal request. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to submit withdrawal request",
         variant: "destructive",
       })
       return false
@@ -66,7 +69,13 @@ export function useWithdraw() {
 
     setHistoryLoading(true)
     try {
-      const data = await getUserWithdrawHistory(user.id)
+      const response = await fetch('/api/user/withdrawals')
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.message || 'Failed to fetch withdrawal history')
+      }
+
+      const data = await response.json()
       setHistory(data)
     } catch (error) {
       console.error('Error fetching withdrawal history:', error)

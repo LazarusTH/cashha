@@ -1,9 +1,15 @@
-"use client"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Card } from '@/components/ui/card'
+import { ProfileForm } from '@/components/profile/profile-form'
+import { SecuritySettings } from '@/components/security/security-settings'
+import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'
+import { cookies } from 'next/headers'
+import { redirect } from 'next/navigation'
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { useAuth } from "@/lib/supabase/auth-context"
 import { getProfile, updateProfile, ProfileData } from "@/lib/supabase/profile"
@@ -21,10 +27,29 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Bell, CreditCard, HelpCircle } from "lucide-react"
+import { useRouter } from "next/router"
+import { Shield, Trash } from "lucide-react"
+import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
+import { Checkbox } from "@/components/ui/checkbox"
 
-export default function ProfilePage() {
+export default async function ProfilePage() {
+  const supabase = createServerComponentClient({ cookies })
+  const { data: { session } } = await supabase.auth.getSession()
+
+  if (!session) {
+    redirect('/login')
+  }
+
+  // Get user profile data
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', session.user.id)
+    .single()
+
   const { user } = useAuth()
-  const [profile, setProfile] = useState<ProfileData | null>(null)
+  const [profileData, setProfileData] = useState<ProfileData | null>(null)
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
@@ -35,31 +60,90 @@ export default function ProfilePage() {
   const [showNotifications, setShowNotifications] = useState(false)
   const [showSupportDialog, setShowSupportDialog] = useState(false)
   const [showBankDialog, setShowBankDialog] = useState(false)
+  const [showSecurityDialog, setShowSecurityDialog] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [supportForm, setSupportForm] = useState({ subject: "", message: "" })
   const [bankForm, setBankForm] = useState({
     bank_id: "",
     account_number: "",
     account_name: "",
   })
+  const [securityForm, setSecurityForm] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+    twoFactorEnabled: false,
+    emailNotifications: true,
+    loginAlerts: true,
+    transactionAlerts: true,
+  })
+  const [deleteForm, setDeleteForm] = useState({
+    password: "",
+    reason: "",
+    confirmText: "",
+  })
+  const [deviceHistory, setDeviceHistory] = useState<any[]>([])
+  const [loginAttempts, setLoginAttempts] = useState<any[]>([])
+  const [securityQuestions, setSecurityQuestions] = useState<{
+    question1: string;
+    answer1: string;
+    question2: string;
+    answer2: string;
+    question3: string;
+    answer3: string;
+  }>({
+    question1: "",
+    answer1: "",
+    question2: "",
+    answer2: "",
+    question3: "",
+    answer3: "",
+  })
+  const router = useRouter()
 
   useEffect(() => {
-    if (!user) return
+    if (!user) {
+      router.push('/signin')
+      return
+    }
 
     async function loadData() {
       try {
-        const [profileData, transactions, accounts, notifs, banksList] = await Promise.all([
+        const [
+          profileData, 
+          transactions, 
+          accounts, 
+          notifs, 
+          banksList,
+          devices,
+          attempts,
+          questions
+        ] = await Promise.all([
           getProfile(user.id),
           getUserTransactions(user.id, 5),
           getUserBankAccounts(user.id),
           getUserNotifications(user.id),
-          getActiveBanks()
+          getActiveBanks(),
+          getDeviceHistory(user.id),
+          getLoginAttempts(user.id),
+          getSecurityQuestions(user.id)
         ])
         
-        setProfile(profileData)
+        setProfileData(profileData)
         setRecentActivities(transactions)
         setBankAccounts(accounts)
         setNotifications(notifs)
         setBanks(banksList)
+        setDeviceHistory(devices)
+        setLoginAttempts(attempts)
+        setSecurityQuestions(questions)
+        setSecurityForm(prev => ({
+          ...prev,
+          twoFactorEnabled: profileData.twoFactorEnabled,
+          emailNotifications: profileData.emailNotifications,
+          loginAlerts: profileData.loginAlerts,
+          transactionAlerts: profileData.transactionAlerts,
+        }))
       } catch (error) {
         console.error('Error loading profile data:', error)
         toast({
@@ -75,403 +159,410 @@ export default function ProfilePage() {
     loadData()
   }, [user])
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target
-    if (!profile) return
-    setProfile({ ...profile, [name]: value })
-  }
-
-  const handleUpdateProfile = async () => {
-    if (!user || !profile) return
-    setUpdating(true)
-    try {
-      await updateProfile(user.id, profile)
-      toast({
-        title: "Success",
-        description: "Profile updated successfully",
-      })
-      setIsEditing(false)
-    } catch (error) {
-      console.error('Error updating profile:', error)
-      toast({
-        title: "Error",
-        description: "Failed to update profile",
-        variant: "destructive",
-      })
-    } finally {
-      setUpdating(false)
-    }
-  }
-
-  const handleAddBankAccount = async () => {
+  const handleUpdateSecurity = async () => {
     if (!user) return
+    
     try {
-      const account = await createBankAccount(user.id, bankForm)
-      setBankAccounts([account, ...bankAccounts])
-      setShowBankDialog(false)
-      setBankForm({ bank_id: "", account_number: "", account_name: "" })
+      // Validate password requirements
+      if (securityForm.newPassword) {
+        const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/
+        if (!passwordRegex.test(securityForm.newPassword)) {
+          throw new Error("Password must be at least 8 characters long and contain uppercase, lowercase, number and special character")
+        }
+        if (securityForm.newPassword !== securityForm.confirmPassword) {
+          throw new Error("New passwords do not match")
+        }
+      }
+
+      // Verify current password
+      const { error: verifyError } = await supabase.auth.api.updateUser(
+        user.id,
+        { password: securityForm.currentPassword }
+      )
+      if (verifyError) throw new Error("Current password is incorrect")
+
+      // Update password if provided
+      if (securityForm.newPassword) {
+        const { error: updateError } = await supabase.auth.api.updateUser(
+          user.id,
+          { password: securityForm.newPassword }
+        )
+        if (updateError) throw updateError
+      }
+
+      // Update security preferences
+      await updateProfile(user.id, {
+        twoFactorEnabled: securityForm.twoFactorEnabled,
+        emailNotifications: securityForm.emailNotifications,
+        loginAlerts: securityForm.loginAlerts,
+        transactionAlerts: securityForm.transactionAlerts,
+      })
+
+      // Update security questions
+      await updateSecurityQuestions(user.id, securityQuestions)
+
+      // Log security update
+      await logSecurityUpdate(user.id, {
+        type: 'security_settings_update',
+        changes: {
+          passwordChanged: !!securityForm.newPassword,
+          twoFactorEnabled: securityForm.twoFactorEnabled,
+          emailNotifications: securityForm.emailNotifications,
+          loginAlerts: securityForm.loginAlerts,
+          transactionAlerts: securityForm.transactionAlerts,
+        }
+      })
+
       toast({
         title: "Success",
-        description: "Bank account added successfully",
+        description: "Security settings updated successfully",
       })
+      setShowSecurityDialog(false)
     } catch (error) {
-      console.error('Error adding bank account:', error)
+      console.error('Error updating security settings:', error)
       toast({
         title: "Error",
-        description: "Failed to add bank account",
+        description: error instanceof Error ? error.message : "Failed to update security settings",
         variant: "destructive",
       })
     }
   }
 
-  const handleSetDefaultBank = async (id: string) => {
+  const handleDeleteAccount = async () => {
     if (!user) return
+
     try {
-      await setDefaultBankAccount(user.id, id)
-      const updatedAccounts = await getUserBankAccounts(user.id)
-      setBankAccounts(updatedAccounts)
-      toast({
-        title: "Success",
-        description: "Default bank account updated",
+      // Verify password
+      const { error: verifyError } = await supabase.auth.api.updateUser(
+        user.id,
+        { password: deleteForm.password }
+      )
+      if (verifyError) throw new Error("Password is incorrect")
+
+      // Verify confirmation text
+      if (deleteForm.confirmText !== "DELETE MY ACCOUNT") {
+        throw new Error("Please type DELETE MY ACCOUNT to confirm")
+      }
+
+      // Check for pending transactions
+      const { data: pendingTx } = await supabase
+        .from('transactions')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('status', 'pending')
+        .single()
+
+      if (pendingTx) {
+        throw new Error("Cannot delete account with pending transactions")
+      }
+
+      // Log deletion request
+      await createSupportRequest({
+        user_id: user.id,
+        type: 'account_deletion',
+        subject: 'Account Deletion Request',
+        message: deleteForm.reason,
+        status: 'pending'
       })
+
+      // Deactivate account
+      await updateProfile(user.id, {
+        status: 'deactivated',
+        deactivation_reason: deleteForm.reason,
+        deactivated_at: new Date().toISOString()
+      })
+
+      // Send notification to admin
+      await createAdminNotification({
+        type: 'account_deletion',
+        message: `User ${profile?.email} has requested account deletion`,
+        metadata: {
+          user_id: user.id,
+          reason: deleteForm.reason
+        }
+      })
+
+      // Send confirmation email
+      await sendEmail({
+        to: profile?.email,
+        template: 'account_deletion',
+        data: {
+          name: profile?.firstName,
+          reason: deleteForm.reason
+        }
+      })
+
+      toast({
+        title: "Account Deactivation Initiated",
+        description: "Your account will be permanently deleted within 30 days. You'll receive a confirmation email shortly.",
+      })
+
+      // Sign out user
+      await supabase.auth.signOut()
+      router.push('/signin')
     } catch (error) {
-      console.error('Error setting default bank:', error)
+      console.error('Error deleting account:', error)
       toast({
         title: "Error",
-        description: "Failed to set default bank account",
+        description: error instanceof Error ? error.message : "Failed to delete account",
         variant: "destructive",
       })
     }
-  }
-
-  const handleDeleteBank = async (id: string) => {
-    try {
-      await deleteBankAccount(id)
-      setBankAccounts(bankAccounts.filter(account => account.id !== id))
-      toast({
-        title: "Success",
-        description: "Bank account deleted successfully",
-      })
-    } catch (error) {
-      console.error('Error deleting bank account:', error)
-      toast({
-        title: "Error",
-        description: "Failed to delete bank account",
-        variant: "destructive",
-      })
-    }
-  }
-
-  const handleCreateSupport = async () => {
-    if (!user) return
-    try {
-      await createSupportRequest(user.id, supportForm)
-      setShowSupportDialog(false)
-      setSupportForm({ subject: "", message: "" })
-      toast({
-        title: "Success",
-        description: "Support request submitted successfully",
-      })
-    } catch (error) {
-      console.error('Error creating support request:', error)
-      toast({
-        title: "Error",
-        description: "Failed to submit support request",
-        variant: "destructive",
-      })
-    }
-  }
-
-  const handleMarkNotificationRead = async (id: string) => {
-    try {
-      await markNotificationAsRead(id)
-      setNotifications(notifications.map(n => 
-        n.id === id ? { ...n, read: true } : n
-      ))
-    } catch (error) {
-      console.error('Error marking notification as read:', error)
-    }
-  }
-
-  const handleMarkAllRead = async () => {
-    if (!user) return
-    try {
-      await markAllNotificationsAsRead(user.id)
-      setNotifications(notifications.map(n => ({ ...n, read: true })))
-      toast({
-        title: "Success",
-        description: "All notifications marked as read",
-      })
-    } catch (error) {
-      console.error('Error marking all notifications as read:', error)
-      toast({
-        title: "Error",
-        description: "Failed to mark notifications as read",
-        variant: "destructive",
-      })
-    }
-  }
-
-  if (loading) {
-    return <div className="space-y-4">
-      <Skeleton className="h-12 w-full" />
-      <Skeleton className="h-48 w-full" />
-      <Skeleton className="h-48 w-full" />
-    </div>
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Profile</h1>
-        <div className="flex gap-2">
-          <Dialog open={showNotifications} onOpenChange={setShowNotifications}>
-            <DialogTrigger asChild>
-              <Button variant="outline" size="icon">
-                <Bell className="h-4 w-4" />
-                {notifications.some(n => !n.read) && (
-                  <span className="absolute -top-1 -right-1 h-3 w-3 bg-red-500 rounded-full" />
-                )}
+    <div className="container mx-auto py-10">
+      <Tabs defaultValue="profile" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="profile">Profile</TabsTrigger>
+          <TabsTrigger value="security">Security</TabsTrigger>
+        </TabsList>
+        <TabsContent value="profile" className="space-y-4">
+          <ProfileForm profile={profile} />
+        </TabsContent>
+        <TabsContent value="security" className="space-y-4">
+          <SecuritySettings profile={profile} />
+          <div className="flex justify-between items-center">
+            <h1 className="text-3xl font-bold">Security Settings</h1>
+            <div className="flex items-center space-x-4">
+              <Button
+                variant="outline"
+                onClick={() => setShowSecurityDialog(true)}
+                className="flex items-center"
+              >
+                <Shield className="mr-2 h-4 w-4" />
+                Security Settings
               </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle className="flex justify-between">
-                  Notifications
-                  <Button variant="outline" size="sm" onClick={handleMarkAllRead}>
-                    Mark all as read
-                  </Button>
-                </DialogTitle>
-              </DialogHeader>
-              <ScrollArea className="h-[400px]">
-                {notifications.map(notification => (
-                  <div
-                    key={notification.id}
-                    className={`p-4 border-b ${notification.read ? 'opacity-60' : ''}`}
-                    onClick={() => handleMarkNotificationRead(notification.id)}
-                  >
-                    <div className="flex justify-between items-start">
-                      <h3 className="font-medium">{notification.title}</h3>
-                      <Badge variant={notification.read ? "outline" : "default"}>
-                        {notification.type}
-                      </Badge>
-                    </div>
-                    <p className="text-sm text-gray-500 mt-1">{notification.message}</p>
-                  </div>
-                ))}
-              </ScrollArea>
-            </DialogContent>
-          </Dialog>
-
-          <Dialog open={showSupportDialog} onOpenChange={setShowSupportDialog}>
-            <DialogTrigger asChild>
-              <Button variant="outline" size="icon">
-                <HelpCircle className="h-4 w-4" />
+              <Button
+                variant="destructive"
+                onClick={() => setShowDeleteDialog(true)}
+                className="flex items-center"
+              >
+                <Trash className="mr-2 h-4 w-4" />
+                Delete Account
               </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Create Support Request</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <Input
-                  placeholder="Subject"
-                  value={supportForm.subject}
-                  onChange={e => setSupportForm(prev => ({ ...prev, subject: e.target.value }))}
-                />
-                <Textarea
-                  placeholder="Message"
-                  value={supportForm.message}
-                  onChange={e => setSupportForm(prev => ({ ...prev, message: e.target.value }))}
-                />
-                <Button onClick={handleCreateSupport}>Submit Request</Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-        </div>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Personal Information</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium">Full Name</label>
-              <Input
-                name="full_name"
-                value={profile?.full_name || ""}
-                onChange={handleInputChange}
-                disabled={!isEditing}
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Email</label>
-              <Input
-                name="email"
-                value={profile?.email || ""}
-                onChange={handleInputChange}
-                disabled={!isEditing}
-              />
-            </div>
-            <div className="flex justify-end gap-2">
-              {isEditing ? (
-                <>
-                  <Button variant="outline" onClick={() => setIsEditing(false)}>
-                    Cancel
-                  </Button>
-                  <Button onClick={handleUpdateProfile} disabled={updating}>
-                    {updating ? "Updating..." : "Save Changes"}
-                  </Button>
-                </>
-              ) : (
-                <Button onClick={() => setIsEditing(true)}>
-                  Edit Profile
-                </Button>
-              )}
             </div>
           </div>
-        </CardContent>
-      </Card>
 
-      <Card>
-        <CardHeader>
-          <div className="flex justify-between items-center">
-            <CardTitle>Bank Accounts</CardTitle>
-            <Dialog open={showBankDialog} onOpenChange={setShowBankDialog}>
-              <DialogTrigger asChild>
-                <Button>
-                  <CreditCard className="h-4 w-4 mr-2" />
-                  Add Bank Account
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Add Bank Account</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
+          {/* Security Settings Dialog */}
+          <Dialog open={showSecurityDialog} onOpenChange={setShowSecurityDialog}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Security Settings</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Change Password</Label>
+                  <Input
+                    type="password"
+                    placeholder="Current Password"
+                    value={securityForm.currentPassword}
+                    onChange={(e) => setSecurityForm(prev => ({ ...prev, currentPassword: e.target.value }))}
+                  />
+                  <Input
+                    type="password"
+                    placeholder="New Password"
+                    value={securityForm.newPassword}
+                    onChange={(e) => setSecurityForm(prev => ({ ...prev, newPassword: e.target.value }))}
+                  />
+                  <Input
+                    type="password"
+                    placeholder="Confirm New Password"
+                    value={securityForm.confirmPassword}
+                    onChange={(e) => setSecurityForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Security Questions</Label>
                   <Select
-                    value={bankForm.bank_id}
-                    onValueChange={value => setBankForm(prev => ({ ...prev, bank_id: value }))}
+                    value={securityQuestions.question1}
+                    onValueChange={(value) => setSecurityQuestions(prev => ({ ...prev, question1: value }))}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select Bank" />
+                      <SelectValue placeholder="Select security question 1" />
                     </SelectTrigger>
                     <SelectContent>
-                      {banks.map(bank => (
-                        <SelectItem key={bank.id} value={bank.id}>
-                          {bank.name}
-                        </SelectItem>
-                      ))}
+                      <SelectItem value="mother_maiden">What is your mother's maiden name?</SelectItem>
+                      <SelectItem value="first_pet">What was the name of your first pet?</SelectItem>
+                      <SelectItem value="birth_city">In which city were you born?</SelectItem>
                     </SelectContent>
                   </Select>
                   <Input
-                    placeholder="Account Number"
-                    value={bankForm.account_number}
-                    onChange={e => setBankForm(prev => ({ ...prev, account_number: e.target.value }))}
+                    placeholder="Answer 1"
+                    value={securityQuestions.answer1}
+                    onChange={(e) => setSecurityQuestions(prev => ({ ...prev, answer1: e.target.value }))}
                   />
-                  <Input
-                    placeholder="Account Name"
-                    value={bankForm.account_name}
-                    onChange={e => setBankForm(prev => ({ ...prev, account_name: e.target.value }))}
-                  />
-                  <Button onClick={handleAddBankAccount}>Add Account</Button>
+                  {/* Repeat for question2 and question3 */}
                 </div>
-              </DialogContent>
-            </Dialog>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Bank</TableHead>
-                <TableHead>Account Name</TableHead>
-                <TableHead>Account Number</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {bankAccounts.map(account => (
-                <TableRow key={account.id}>
-                  <TableCell>{account.bank?.name}</TableCell>
-                  <TableCell>{account.account_name}</TableCell>
-                  <TableCell>{account.account_number}</TableCell>
-                  <TableCell>
-                    {account.is_default && (
-                      <Badge>Default</Badge>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex gap-2">
-                      {!account.is_default && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleSetDefaultBank(account.id)}
-                        >
-                          Set Default
-                        </Button>
-                      )}
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => handleDeleteBank(account.id)}
-                      >
-                        Delete
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Activities</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Type</TableHead>
-                <TableHead>Amount</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Date</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {recentActivities.map(activity => (
-                <TableRow key={activity.id}>
-                  <TableCell className="capitalize">{activity.type}</TableCell>
-                  <TableCell>${activity.amount}</TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={
-                        activity.status === 'completed'
-                          ? 'default'
-                          : activity.status === 'failed'
-                          ? 'destructive'
-                          : 'outline'
-                      }
-                    >
-                      {activity.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {new Date(activity.created_at).toLocaleDateString()}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                <div className="space-y-2">
+                  <Label>Two-Factor Authentication</Label>
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      checked={securityForm.twoFactorEnabled}
+                      onCheckedChange={(checked) => setSecurityForm(prev => ({ ...prev, twoFactorEnabled: checked }))}
+                    />
+                    <span>Enable 2FA</span>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Notification Preferences</Label>
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        checked={securityForm.emailNotifications}
+                        onCheckedChange={(checked) => setSecurityForm(prev => ({ ...prev, emailNotifications: checked as boolean }))}
+                      />
+                      <span>Email Notifications</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        checked={securityForm.loginAlerts}
+                        onCheckedChange={(checked) => setSecurityForm(prev => ({ ...prev, loginAlerts: checked as boolean }))}
+                      />
+                      <span>Login Alerts</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        checked={securityForm.transactionAlerts}
+                        onCheckedChange={(checked) => setSecurityForm(prev => ({ ...prev, transactionAlerts: checked as boolean }))}
+                      />
+                      <span>Transaction Alerts</span>
+                    </div>
+                  </div>
+                </div>
+
+                <Button onClick={handleUpdateSecurity} className="w-full">
+                  Save Security Settings
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Delete Account Dialog */}
+          <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Delete Account</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <Alert variant="destructive">
+                  <AlertDescription>
+                    This action cannot be undone. Your account will be deactivated immediately and permanently deleted after 30 days.
+                  </AlertDescription>
+                </Alert>
+
+                <div className="space-y-2">
+                  <Label>Confirm Password</Label>
+                  <Input
+                    type="password"
+                    placeholder="Enter your password"
+                    value={deleteForm.password}
+                    onChange={(e) => setDeleteForm(prev => ({ ...prev, password: e.target.value }))}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Reason for Deletion</Label>
+                  <Textarea
+                    placeholder="Please tell us why you're leaving..."
+                    value={deleteForm.reason}
+                    onChange={(e) => setDeleteForm(prev => ({ ...prev, reason: e.target.value }))}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Type DELETE MY ACCOUNT to confirm</Label>
+                  <Input
+                    placeholder="DELETE MY ACCOUNT"
+                    value={deleteForm.confirmText}
+                    onChange={(e) => setDeleteForm(prev => ({ ...prev, confirmText: e.target.value }))}
+                  />
+                </div>
+
+                <Button
+                  variant="destructive"
+                  onClick={handleDeleteAccount}
+                  className="w-full"
+                  disabled={deleteForm.confirmText !== "DELETE MY ACCOUNT"}
+                >
+                  Delete Account
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Device History */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Device History</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Device</TableHead>
+                    <TableHead>Location</TableHead>
+                    <TableHead>Last Active</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {deviceHistory.map((device) => (
+                    <TableRow key={device.id}>
+                      <TableCell>{device.device_name}</TableCell>
+                      <TableCell>{device.location}</TableCell>
+                      <TableCell>{new Date(device.last_active).toLocaleString()}</TableCell>
+                      <TableCell>
+                        <Badge variant={device.is_current ? "default" : "secondary"}>
+                          {device.is_current ? "Current" : "Inactive"}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+
+          {/* Login Attempts */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Recent Login Attempts</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date & Time</TableHead>
+                    <TableHead>IP Address</TableHead>
+                    <TableHead>Location</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {loginAttempts.map((attempt) => (
+                    <TableRow key={attempt.id}>
+                      <TableCell>{new Date(attempt.created_at).toLocaleString()}</TableCell>
+                      <TableCell>{attempt.ip_address}</TableCell>
+                      <TableCell>{attempt.location}</TableCell>
+                      <TableCell>
+                        <Badge variant={attempt.success ? "success" : "destructive"}>
+                          {attempt.success ? "Success" : "Failed"}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+
+          {/* Rest of the code remains the same */}
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

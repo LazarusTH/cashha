@@ -1,8 +1,8 @@
 "use client"
 
-// Backend Integration: This entire file needs backend integration to fetch and send emails.
+// Backend Integration: This page is integrated with the backend API to manage email sending.
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -10,24 +10,54 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { useToast } from "@/components/ui/use-toast"
 
-// Mock users data, replace this with backend API call.
-const mockUsers = [
-  { id: 1, username: "johndoe", email: "john@example.com" },
-  { id: 2, username: "janesmith", email: "jane@example.com" },
-]
+interface User {
+  id: number
+  username: string
+  email: string
+}
 
 export default function EmailModulePage() {
-  // Backend Integration: Replace mock data with data fetched from backend.
+  const [users, setUsers] = useState<User[]>([])
   const [selectedUsers, setSelectedUsers] = useState<number[]>([])
   const [subject, setSubject] = useState("")
   const [message, setMessage] = useState("")
+  const [loading, setLoading] = useState(true)
+  const [sending, setSending] = useState(false)
+  const { toast } = useToast()
+
+  useEffect(() => {
+    fetchUsers()
+  }, [])
+
+  const fetchUsers = async () => {
+    try {
+      const response = await fetch('/api/admin/users')
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch users')
+      }
+
+      setUsers(data.users)
+    } catch (error) {
+      console.error('Error fetching users:', error)
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to fetch users',
+        variant: 'destructive',
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleSelectAll = () => {
-    if (selectedUsers.length === mockUsers.length) {
+    if (selectedUsers.length === users.length) {
       setSelectedUsers([])
     } else {
-      setSelectedUsers(mockUsers.map((user) => user.id))
+      setSelectedUsers(users.map((user) => user.id))
     }
   }
 
@@ -37,6 +67,62 @@ export default function EmailModulePage() {
     } else {
       setSelectedUsers([...selectedUsers, userId])
     }
+  }
+
+  const handleSendEmail = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (selectedUsers.length === 0) {
+      toast({
+        title: 'Error',
+        description: 'Please select at least one recipient',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    setSending(true)
+    try {
+      const response = await fetch('/api/admin/email/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          user_ids: selectedUsers,
+          subject,
+          message,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to send email')
+      }
+
+      toast({
+        title: 'Success',
+        description: 'Email sent successfully',
+      })
+
+      // Reset form
+      setSelectedUsers([])
+      setSubject('')
+      setMessage('')
+    } catch (error) {
+      console.error('Error sending email:', error)
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to send email',
+        variant: 'destructive',
+      })
+    } finally {
+      setSending(false)
+    }
+  }
+
+  if (loading) {
+    return <div>Loading users...</div>
   }
 
   return (
@@ -52,15 +138,13 @@ export default function EmailModulePage() {
             <div className="flex items-center space-x-2">
               <Checkbox
                 id="selectAll"
-                checked={selectedUsers.length === mockUsers.length}
+                checked={selectedUsers.length === users.length}
                 onCheckedChange={handleSelectAll}
               />
               <Label htmlFor="selectAll">Select All Users</Label>
-              
             </div>
-            {/* Backend Integration: Fetch user data from backend API */}
             <ScrollArea className="h-[200px] border rounded-md p-4">
-              {mockUsers.map((user) => (
+              {users.map((user) => (
                 <div key={user.id} className="flex items-center space-x-2 py-2">
                   <Checkbox
                     id={`user-${user.id}`}
@@ -82,10 +166,16 @@ export default function EmailModulePage() {
           <CardTitle>Compose Email</CardTitle>
         </CardHeader>
         <CardContent>
-          <form className="space-y-4">
+          <form onSubmit={handleSendEmail} className="space-y-4">
             <div>
               <Label htmlFor="subject">Subject</Label>
-              <Input id="subject" value={subject} onChange={(e) => setSubject(e.target.value)} required />
+              <Input 
+                id="subject" 
+                value={subject} 
+                onChange={(e) => setSubject(e.target.value)} 
+                required 
+                disabled={sending}
+              />
             </div>
             <div>
               <Label htmlFor="message">Message</Label>
@@ -95,11 +185,11 @@ export default function EmailModulePage() {
                 onChange={(e) => setMessage(e.target.value)}
                 required
                 className="min-h-[200px]"
+                disabled={sending}
               />
             </div>
-            {/* Backend Integration: Send email through backend API */}
-            <Button type="submit" disabled={selectedUsers.length === 0}>
-              Send Email
+            <Button type="submit" disabled={selectedUsers.length === 0 || sending}>
+              {sending ? 'Sending...' : 'Send Email'}
             </Button>
           </form>
         </CardContent>
@@ -107,4 +197,3 @@ export default function EmailModulePage() {
     </div>
   )
 }
-

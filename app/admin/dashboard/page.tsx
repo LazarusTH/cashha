@@ -16,25 +16,54 @@ import {
   ResponsiveContainer,
 } from "recharts"
 import { ArrowUpIcon, ArrowDownIcon, ArrowRightIcon, DollarSignIcon, UsersIcon, BankIcon, LifeBuoyIcon } from "lucide-react"
-import { useAdmin } from "@/lib/hooks/use-admin"
+import { useToast } from "@/components/ui/use-toast"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Transaction } from "@/lib/supabase/transactions"
-import { Bank, createBank, updateBank, deleteBank } from "@/lib/supabase/banks"
-import { SupportRequest, updateSupportRequestStatus } from "@/lib/supabase/support"
-import { ProfileData } from "@/lib/supabase/profile"
+import { supabase } from "@/lib/supabase"
 
 interface MetricCardProps {
   title: string
   value: string | number
   icon: React.ReactNode
   loading?: boolean
+}
+
+interface DashboardData {
+  metrics: {
+    totalUsers: number
+    totalDeposits: number
+    totalWithdrawals: number
+    totalSendingRequests: number
+  }
+  recentTransactions: {
+    id: number
+    type: string
+    amount: number
+    username: string
+    status: string
+    date: string
+  }[]
+  chartData: {
+    date: string
+    deposits: number
+    withdrawals: number
+    sends: number
+  }[]
+  supportRequests: {
+    id: number
+    userId: number
+    username: string
+    subject: string
+    message: string
+    status: string
+    date: string
+  }[]
 }
 
 function MetricCard({ title, value, icon, loading }: MetricCardProps) {
@@ -55,338 +84,190 @@ function MetricCard({ title, value, icon, loading }: MetricCardProps) {
   )
 }
 
-interface TransactionDialogProps {
-  transaction: Transaction
-  onUpdate: (status: Transaction['status'], note: string) => void
-}
-
-function TransactionDialog({ transaction, onUpdate }: TransactionDialogProps) {
-  const [status, setStatus] = useState(transaction.status)
-  const [note, setNote] = useState("")
-
-  return (
-    <div className="space-y-4">
-      <div>
-        <label className="text-sm font-medium">Status</label>
-        <Select value={status} onValueChange={setStatus}>
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="pending">Pending</SelectItem>
-            <SelectItem value="completed">Completed</SelectItem>
-            <SelectItem value="failed">Failed</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      <div>
-        <label className="text-sm font-medium">Admin Note</label>
-        <Textarea value={note} onChange={e => setNote(e.target.value)} />
-      </div>
-      <Button onClick={() => onUpdate(status as Transaction['status'], note)}>
-        Update Transaction
-      </Button>
-    </div>
-  )
-}
-
-interface BankDialogProps {
-  bank?: Bank
-  onSubmit: (data: { name: string; status: Bank['status'] }) => void
-}
-
-function BankDialog({ bank, onSubmit }: BankDialogProps) {
-  const [name, setName] = useState(bank?.name || "")
-  const [status, setStatus] = useState<Bank['status']>(bank?.status || "active")
-
-  return (
-    <div className="space-y-4">
-      <div>
-        <label className="text-sm font-medium">Bank Name</label>
-        <Input value={name} onChange={e => setName(e.target.value)} />
-      </div>
-      <div>
-        <label className="text-sm font-medium">Status</label>
-        <Select value={status} onValueChange={value => setStatus(value as Bank['status'])}>
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="active">Active</SelectItem>
-            <SelectItem value="inactive">Inactive</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      <Button onClick={() => onSubmit({ name, status })}>
-        {bank ? "Update Bank" : "Add Bank"}
-      </Button>
-    </div>
-  )
-}
-
-interface SupportRequestDialogProps {
-  request: SupportRequest
-  onUpdate: (status: SupportRequest['status'], note: string) => void
-}
-
-function SupportRequestDialog({ request, onUpdate }: SupportRequestDialogProps) {
-  const [status, setStatus] = useState(request.status)
-  const [note, setNote] = useState("")
-
-  return (
-    <div className="space-y-4">
-      <div>
-        <label className="text-sm font-medium">Status</label>
-        <Select value={status} onValueChange={value => setStatus(value as SupportRequest['status'])}>
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="open">Open</SelectItem>
-            <SelectItem value="in_progress">In Progress</SelectItem>
-            <SelectItem value="resolved">Resolved</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      <div>
-        <label className="text-sm font-medium">Admin Note</label>
-        <Textarea value={note} onChange={e => setNote(e.target.value)} />
-      </div>
-      <Button onClick={() => onUpdate(status as SupportRequest['status'], note)}>
-        Update Support Request
-      </Button>
-    </div>
-  )
-}
-
 export default function AdminDashboard() {
-  const { 
-    transactions, 
-    transactionsLoading, 
-    metrics,
-    metricsLoading,
-    updateLoading,
-    users,
-    usersLoading,
-    banks,
-    banksLoading,
-    supportRequests,
-    supportRequestsLoading,
-    transactionStats,
-    transactionStatsLoading,
-    fetchTransactions,
-    updateTransaction,
-    fetchMetrics,
-    fetchUsers,
-    updateRole,
-    fetchBanks,
-    fetchSupportRequests,
-    updateSupportRequest,
-    fetchTransactionStats
-  } = useAdmin()
-  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null)
-  const [showTransactionDialog, setShowTransactionDialog] = useState(false)
-  const [selectedBank, setSelectedBank] = useState<Bank | null>(null)
-  const [showBankDialog, setShowBankDialog] = useState(false)
-  const [selectedSupportRequest, setSelectedSupportRequest] = useState<SupportRequest | null>(null)
-  const [showSupportRequestDialog, setShowSupportRequestDialog] = useState(false)
+  const [dashboardData, setDashboardData] = useState<DashboardData>({
+    metrics: {
+      totalUsers: 0,
+      totalDeposits: 0,
+      totalWithdrawals: 0,
+      totalSendingRequests: 0,
+    },
+    recentTransactions: [],
+    chartData: [],
+    supportRequests: [],
+  })
+  const [loading, setLoading] = useState(true)
+  const [timeRange, setTimeRange] = useState("7d")
+  const { toast } = useToast()
 
-  const handleUpdateTransaction = async (status: Transaction['status'], note: string) => {
-    if (!selectedTransaction) return
-    try {
-      // Update transaction status
-      await fetch('/api/transactions/update', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: selectedTransaction.id,
-          status,
-          metadata: {
-            ...selectedTransaction.metadata,
-            adminNote: note,
-          },
-        }),
+  useEffect(() => {
+    const notificationChannel = supabase
+      .channel('admin_notifications')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'transactions',
+      }, () => {
+        fetchDashboardData()
       })
-      setShowTransactionDialog(false)
-      fetchTransactions()
-    } catch (error) {
-      console.error('Error updating transaction:', error)
-    }
-  }
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'support_requests',
+      }, () => {
+        fetchDashboardData()
+      })
+      .subscribe()
 
-  const handleBankSubmit = async (data: { name: string; status: Bank['status'] }) => {
+    return () => {
+      notificationChannel.unsubscribe()
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchDashboardData()
+  }, [timeRange])
+
+  const fetchDashboardData = async () => {
     try {
-      if (selectedBank) {
-        // Update existing bank
-        await fetch('/api/banks', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            id: selectedBank.id,
-            ...data
-          }),
-        })
-      } else {
-        // Create new bank
-        await fetch('/api/banks', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data),
-        })
+      const response = await fetch(`/api/admin/dashboard?timeRange=${timeRange}`)
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch dashboard data')
       }
-      setShowBankDialog(false)
-      fetchBanks()
+
+      setDashboardData(data)
     } catch (error) {
-      console.error('Error managing bank:', error)
+      console.error('Error fetching dashboard data:', error)
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to fetch dashboard data',
+        variant: 'destructive',
+      })
+    } finally {
+      setLoading(false)
     }
   }
 
-  const handleDeleteBank = async (id: string) => {
+  const handleSupportRequestUpdate = async (requestId: number, status: string, response?: string) => {
     try {
-      await fetch(`/api/banks?id=${id}`, {
-        method: 'DELETE',
+      const res = await fetch(`/api/admin/support/${requestId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status, response }),
       })
-      fetchBanks()
-    } catch (error) {
-      console.error('Error deleting bank:', error)
-    }
-  }
 
-  const handleUpdateSupportStatus = async (id: string, status: SupportRequest['status'], note?: string) => {
-    try {
-      await fetch('/api/support/update', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id,
-          status,
-          note
-        }),
+      if (!res.ok) {
+        throw new Error('Failed to update support request')
+      }
+
+      // Update local state
+      setDashboardData(prev => ({
+        ...prev,
+        supportRequests: prev.supportRequests.map(request =>
+          request.id === requestId ? { ...request, status } : request
+        ),
+      }))
+
+      toast({
+        title: 'Success',
+        description: 'Support request updated successfully',
       })
-      setShowSupportRequestDialog(false)
-      fetchSupportRequests()
     } catch (error) {
       console.error('Error updating support request:', error)
-    }
-  }
-
-  const handleUpdateUserRole = async (id: string, role: 'admin' | 'user') => {
-    try {
-      // Update user role
-      await fetch('/api/users/update-role', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id,
-          role,
-        }),
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to update support request',
+        variant: 'destructive',
       })
-      fetchUsers()
-    } catch (error) {
-      console.error('Error updating user role:', error)
     }
-  }
-
-  if (metricsLoading || transactionsLoading || usersLoading || banksLoading || supportRequestsLoading || transactionStatsLoading) {
-    return (
-      <Alert variant="info">
-        <AlertDescription>
-          Loading dashboard data. Please wait...
-        </AlertDescription>
-      </Alert>
-    )
-  }
-
-  if (updateLoading) {
-    return (
-      <Alert variant="info">
-        <AlertDescription>
-          Updating data. Please wait...
-        </AlertDescription>
-      </Alert>
-    )
-  }
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      maximumFractionDigits: 0,
-    }).format(value)
   }
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Admin Dashboard</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Admin Dashboard</h1>
+        <Select value={timeRange} onValueChange={setTimeRange}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Select time range" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="7d">Last 7 Days</SelectItem>
+            <SelectItem value="30d">Last 30 Days</SelectItem>
+            <SelectItem value="90d">Last 90 Days</SelectItem>
+            <SelectItem value="1y">Last Year</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <MetricCard
           title="Total Users"
-          value={metricsLoading ? "..." : metrics?.totalUsers || 0}
-          icon={<UsersIcon className="h-4 w-4" />}
-          loading={metricsLoading}
+          value={loading ? '...' : dashboardData.metrics.totalUsers.toLocaleString()}
+          icon={<UsersIcon className="h-4 w-4 text-muted-foreground" />}
+          loading={loading}
         />
         <MetricCard
-          title="Total Transactions"
-          value={metricsLoading ? "..." : formatCurrency(metrics?.totalTransactions || 0)}
-          icon={<DollarSignIcon className="h-4 w-4" />}
-          loading={metricsLoading}
+          title="Total Deposits"
+          value={loading ? '...' : `${dashboardData.metrics.totalDeposits.toLocaleString()} ETB`}
+          icon={<ArrowDownIcon className="h-4 w-4 text-muted-foreground" />}
+          loading={loading}
         />
         <MetricCard
-          title="Active Banks"
-          value={metricsLoading ? "..." : metrics?.activeBanks || 0}
-          icon={<BankIcon className="h-4 w-4" />}
-          loading={metricsLoading}
+          title="Total Withdrawals"
+          value={loading ? '...' : `${dashboardData.metrics.totalWithdrawals.toLocaleString()} ETB`}
+          icon={<ArrowUpIcon className="h-4 w-4 text-muted-foreground" />}
+          loading={loading}
         />
         <MetricCard
-          title="Open Support Requests"
-          value={metricsLoading ? "..." : metrics?.openSupportRequests || 0}
-          icon={<LifeBuoyIcon className="h-4 w-4" />}
-          loading={metricsLoading}
+          title="Total Sending Requests"
+          value={loading ? '...' : dashboardData.metrics.totalSendingRequests.toLocaleString()}
+          icon={<ArrowRightIcon className="h-4 w-4 text-muted-foreground" />}
+          loading={loading}
         />
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Transaction Volume</CardTitle>
+          <CardTitle>Transaction Overview</CardTitle>
         </CardHeader>
         <CardContent>
-          {transactionStatsLoading ? (
+          {loading ? (
             <Skeleton className="h-[300px] w-full" />
           ) : (
             <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={transactionStats || []}>
+              <AreaChart data={dashboardData.chartData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="date" />
                 <YAxis />
-                <Tooltip formatter={(value) => formatCurrency(value as number)} />
+                <Tooltip />
                 <Legend />
                 <Area
                   type="monotone"
                   dataKey="deposits"
-                  name="Deposits"
                   stackId="1"
-                  stroke="#22c55e"
-                  fill="#22c55e"
-                  fillOpacity={0.5}
+                  stroke="#10b981"
+                  fill="#10b981"
+                  name="Deposits"
                 />
                 <Area
                   type="monotone"
                   dataKey="withdrawals"
-                  name="Withdrawals"
                   stackId="1"
-                  stroke="#ef4444"
-                  fill="#ef4444"
-                  fillOpacity={0.5}
+                  stroke="#f43f5e"
+                  fill="#f43f5e"
+                  name="Withdrawals"
                 />
                 <Area
                   type="monotone"
-                  dataKey="transfers"
-                  name="Transfers"
+                  dataKey="sends"
                   stackId="1"
                   stroke="#3b82f6"
                   fill="#3b82f6"
-                  fillOpacity={0.5}
+                  name="Sends"
                 />
               </AreaChart>
             </ResponsiveContainer>
@@ -394,289 +275,103 @@ export default function AdminDashboard() {
         </CardContent>
       </Card>
 
-      <Tabs defaultValue="transactions">
-        <TabsList>
-          <TabsTrigger value="transactions">Transactions</TabsTrigger>
-          <TabsTrigger value="banks">Banks</TabsTrigger>
-          <TabsTrigger value="support">Support</TabsTrigger>
-          <TabsTrigger value="users">Users</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="transactions" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent Transactions</CardTitle>
-            </CardHeader>
-            <CardContent>
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent Transactions</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <div className="space-y-2">
+                {[...Array(5)].map((_, i) => (
+                  <Skeleton key={i} className="h-12 w-full" />
+                ))}
+              </div>
+            ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>User</TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead>Amount</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {transactions.map((transaction) => (
-                    <TableRow key={transaction.id}>
-                      <TableCell>{transaction.user?.email}</TableCell>
-                      <TableCell className="capitalize">{transaction.type}</TableCell>
-                      <TableCell>{formatCurrency(transaction.amount)}</TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={
-                            transaction.status === 'completed'
-                              ? 'default'
-                              : transaction.status === 'failed'
-                              ? 'destructive'
-                              : 'outline'
-                          }
-                        >
-                          {transaction.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {new Date(transaction.created_at).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedTransaction(transaction)
-                            setShowTransactionDialog(true)
-                          }}
-                        >
-                          Update
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-
-          <Dialog
-            open={showTransactionDialog}
-            onOpenChange={setShowTransactionDialog}
-          >
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Update Transaction</DialogTitle>
-              </DialogHeader>
-              {selectedTransaction && (
-                <TransactionDialog
-                  transaction={selectedTransaction}
-                  onUpdate={handleUpdateTransaction}
-                />
-              )}
-            </DialogContent>
-          </Dialog>
-        </TabsContent>
-
-        <TabsContent value="banks" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <div className="flex justify-between items-center">
-                <CardTitle>Banks</CardTitle>
-                <Button
-                  onClick={() => {
-                    setSelectedBank(null)
-                    setShowBankDialog(true)
-                  }}
-                >
-                  Add Bank
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {banks.map((bank) => (
-                    <TableRow key={bank.id}>
-                      <TableCell>{bank.name}</TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={bank.status === 'active' ? 'default' : 'outline'}
-                        >
-                          {bank.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedBank(bank)
-                              setShowBankDialog(true)
-                            }}
-                          >
-                            Edit
-                          </Button>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => handleDeleteBank(bank.id)}
-                          >
-                            Delete
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-
-          <Dialog open={showBankDialog} onOpenChange={setShowBankDialog}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>
-                  {selectedBank ? "Edit Bank" : "Add Bank"}
-                </DialogTitle>
-              </DialogHeader>
-              <BankDialog
-                bank={selectedBank || undefined}
-                onSubmit={handleBankSubmit}
-              />
-            </DialogContent>
-          </Dialog>
-        </TabsContent>
-
-        <TabsContent value="support" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Support Requests</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
                     <TableHead>User</TableHead>
-                    <TableHead>Subject</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {supportRequests.map((request) => (
-                    <TableRow key={request.id}>
-                      <TableCell>{request.user?.email}</TableCell>
-                      <TableCell>{request.subject}</TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={
-                            request.status === 'resolved'
-                              ? 'default'
-                              : request.status === 'in_progress'
-                              ? 'outline'
-                              : 'secondary'
-                          }
-                        >
-                          {request.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {new Date(request.created_at).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedSupportRequest(request)
-                            setShowSupportRequestDialog(true)
-                          }}
-                        >
-                          Update
-                        </Button>
-                      </TableCell>
+                  {dashboardData.recentTransactions.map((transaction) => (
+                    <TableRow key={transaction.id}>
+                      <TableCell>{transaction.type}</TableCell>
+                      <TableCell>{transaction.amount.toLocaleString()} ETB</TableCell>
+                      <TableCell>{transaction.username}</TableCell>
+                      <TableCell>{transaction.status}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
-            </CardContent>
-          </Card>
+            )}
+          </CardContent>
+        </Card>
 
-          <Dialog open={showSupportRequestDialog} onOpenChange={setShowSupportRequestDialog}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Update Support Request</DialogTitle>
-              </DialogHeader>
-              {selectedSupportRequest && (
-                <SupportRequestDialog
-                  request={selectedSupportRequest}
-                  onUpdate={(status, note) => handleUpdateSupportStatus(selectedSupportRequest.id, status, note)}
-                />
-              )}
-            </DialogContent>
-          </Dialog>
-        </TabsContent>
-
-        <TabsContent value="users" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Users</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Full Name</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Joined</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {users.map((user) => (
-                    <TableRow key={user.id}>
-                      <TableCell>{user.email}</TableCell>
-                      <TableCell>{user.full_name}</TableCell>
-                      <TableCell>
-                        <Select
-                          value={user.role}
-                          onValueChange={(value) =>
-                            handleUpdateUserRole(
-                              user.id,
-                              value as 'admin' | 'user'
-                            )
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="user">User</SelectItem>
-                            <SelectItem value="admin">Admin</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
-                      <TableCell>
-                        {new Date(user.created_at).toLocaleDateString()}
-                      </TableCell>
-                    </TableRow>
+        <Card>
+          <CardHeader>
+            <CardTitle>Support Requests</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <div className="space-y-2">
+                {[...Array(5)].map((_, i) => (
+                  <Skeleton key={i} className="h-12 w-full" />
+                ))}
+              </div>
+            ) : (
+              <ScrollArea className="h-[400px]">
+                <div className="space-y-4">
+                  {dashboardData.supportRequests.map((request) => (
+                    <Card key={request.id}>
+                      <CardHeader className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div className="space-y-1">
+                            <CardTitle className="text-sm font-medium">
+                              {request.username} - {request.subject}
+                            </CardTitle>
+                            <div className="text-sm text-muted-foreground">
+                              {new Date(request.date).toLocaleString()}
+                            </div>
+                          </div>
+                          <Badge
+                            variant={
+                              request.status === 'pending'
+                                ? 'default'
+                                : request.status === 'resolved'
+                                ? 'success'
+                                : 'destructive'
+                            }
+                          >
+                            {request.status}
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="p-4 pt-0">
+                        <p className="text-sm">{request.message}</p>
+                        {request.status === 'pending' && (
+                          <div className="mt-4 flex justify-end space-x-2">
+                            <Button
+                              variant="outline"
+                              onClick={() => handleSupportRequestUpdate(request.id, 'resolved')}
+                            >
+                              Mark as Resolved
+                            </Button>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
                   ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+                </div>
+              </ScrollArea>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }
