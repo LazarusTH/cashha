@@ -1,23 +1,30 @@
 "use client"
-// Backend Integration: This file needs to fetch real data from the backend API.
-// The mock data below needs to be replaced with actual data from the API.
-// Also, the form submission in CreateUserForm needs to send data to the backend API.
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-// Backend Integration: Replace this mock data with actual data from backend API.
-
-// Mock data: Should be replaced by the data from backend API
-const users = [
-  { id: 1, name: "John Doe", email: "john@example.com", status: "Active" },
-  { id: 2, name: "Jane Smith", email: "jane@example.com", status: "Pending" },
-]
+import { useAdmin } from "@/lib/hooks/use-admin"
+import { toast } from "@/components/ui/use-toast"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 export default function UsersManagement() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const { users, usersLoading, error, fetchUsers } = useAdmin()
+
+  useEffect(() => {
+    fetchUsers()
+  }, [])
+
+  if (error) {
+    return (
+      <Alert variant="destructive">
+        <AlertDescription>Failed to load users. Please try again later.</AlertDescription>
+      </Alert>
+    )
+  }
 
   return (
     <div className="space-y-4">
@@ -31,7 +38,10 @@ export default function UsersManagement() {
             <DialogHeader>
               <DialogTitle>Create New User</DialogTitle>
             </DialogHeader>
-            <CreateUserForm onClose={() => setIsDialogOpen(false)} />
+            <CreateUserForm onClose={() => {
+              setIsDialogOpen(false)
+              fetchUsers() // Refresh the list after creating a new user
+            }} />
           </DialogContent>
         </Dialog>
       </div>
@@ -41,17 +51,22 @@ export default function UsersManagement() {
             <TableRow>
               <TableHead>Name</TableHead>
               <TableHead>Email</TableHead>
-              <TableHead>Status</TableHead>
+              <TableHead>Role</TableHead>
               <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {/* Backend Integration: Render data fetched from backend API here. */}
-            {users.map((user) => (
+            {usersLoading ? (
+              <TableRow>
+                <TableCell colSpan={4}>
+                  <Skeleton className="h-10 w-full" />
+                </TableCell>
+              </TableRow>
+            ) : users?.map((user) => (
               <TableRow key={user.id}>
-                <TableCell>{user.name}</TableCell>
+                <TableCell>{user.full_name}</TableCell>
                 <TableCell>{user.email}</TableCell>
-                <TableCell>{user.status}</TableCell>
+                <TableCell>{user.role}</TableCell>
                 <TableCell>
                   <Button variant="outline" size="sm">
                     View
@@ -67,10 +82,44 @@ export default function UsersManagement() {
 }
 
 function CreateUserForm({ onClose }: { onClose: () => void }) {
-  const handleSubmit = (e: React.FormEvent) => {
+  const [loading, setLoading] = useState(false)
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    // Backend Integration: Send the new user data to the backend API here.
-    onClose()
+    setLoading(true)
+
+    const formData = new FormData(e.currentTarget)
+    const userData = {
+      firstName: formData.get('firstName'),
+      lastName: formData.get('lastName'),
+      email: formData.get('email'),
+      username: formData.get('username'),
+    }
+
+    try {
+      const response = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(userData),
+      })
+
+      if (!response.ok) throw new Error('Failed to create user')
+
+      toast({
+        title: "Success",
+        description: "User created successfully",
+      })
+      onClose()
+    } catch (error) {
+      console.error('Error creating user:', error)
+      toast({
+        title: "Error",
+        description: "Failed to create user. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -99,14 +148,14 @@ function CreateUserForm({ onClose }: { onClose: () => void }) {
         </label>
         <Input id="username" name="username" required />
       </div>
-      <div>
-        <label htmlFor="idUpload" className="block text-sm font-medium text-gray-700">
-          ID Upload
-        </label>
-        <Input id="idUpload" name="idUpload" type="file" />
+      <div className="flex justify-end gap-4">
+        <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
+          Cancel
+        </Button>
+        <Button type="submit" disabled={loading}>
+          {loading ? "Creating..." : "Create User"}
+        </Button>
       </div>
-      <Button type="submit">Create User</Button>
     </form>
   )
 }
-

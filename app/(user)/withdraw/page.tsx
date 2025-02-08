@@ -1,38 +1,122 @@
 "use client"
-// Backend Developer: This entire page needs backend integration to fetch and submit real data.
-// Please replace the mock data with real data from the backend API.
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { useToast } from "@/components/ui/use-toast"
 
-// Mock data
-// Backend Integration: Replace this mock data with real data from the backend API
-const withdrawalHistory = [
-  { id: 1, amount: 1000, status: "Completed", date: "2023-06-01" },
-  { id: 2, amount: 500, status: "Pending", date: "2023-06-05" },
-]
+interface Bank {
+  id: string
+  name: string
+  code: string
+  logo_url?: string
+}
 
-// Backend Integration: Replace this mock data with real data from the backend API
-const banks = [
-  { id: 1, name: "Bank A" },
-  { id: 2, name: "Bank B" },
-]
+interface BankAccount {
+  id: string
+  bank: Bank
+  account_number: string
+  account_name: string
+  is_default: boolean
+}
+
+interface Transaction {
+  id: string
+  amount: number
+  status: string
+  created_at: string
+}
 
 export default function WithdrawPage() {
   const [amount, setAmount] = useState("")
-  // Backend Integration: Fetch Bank data from backend API
-  const [bank, setBank] = useState("")
+  const [selectedBank, setSelectedBank] = useState("")
   const [accountNumber, setAccountNumber] = useState("")
   const [accountHolderName, setAccountHolderName] = useState("")
+  const [loading, setLoading] = useState(false)
+  const [banks, setBanks] = useState<BankAccount[]>([])
+  const [withdrawals, setWithdrawals] = useState<Transaction[]>([])
+  const { toast } = useToast()
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    fetchBanks()
+    fetchWithdrawals()
+  }, [])
+
+  const fetchBanks = async () => {
+    try {
+      const response = await fetch('/api/user/banks')
+      const data = await response.json()
+      if (data.accounts) {
+        setBanks(data.accounts)
+      }
+    } catch (error) {
+      console.error('Error fetching banks:', error)
+      toast({
+        title: "Error",
+        description: "Failed to fetch bank accounts",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const fetchWithdrawals = async () => {
+    try {
+      const response = await fetch('/api/withdraw')
+      const data = await response.json()
+      setWithdrawals(data)
+    } catch (error) {
+      console.error('Error fetching withdrawals:', error)
+      toast({
+        title: "Error",
+        description: "Failed to fetch withdrawal history",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // TODO: Implement withdrawal request logic
-    // Backend Integration: Send withdrawal request to the backend API
+    setLoading(true)
+
+    try {
+      const response = await fetch('/api/withdraw', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          amount: Number(amount),
+          bankId: selectedBank,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to process withdrawal')
+      }
+
+      toast({
+        title: "Success",
+        description: "Withdrawal request submitted successfully",
+      })
+
+      // Reset form and refresh data
+      setAmount("")
+      setSelectedBank("")
+      fetchWithdrawals()
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to process withdrawal",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -48,48 +132,34 @@ export default function WithdrawPage() {
               <label htmlFor="amount" className="block text-sm font-medium text-gray-700">
                 Amount (ETB)
               </label>
-              <Input id="amount" type="number" value={amount} onChange={(e) => setAmount(e.target.value)} required />
+              <Input 
+                id="amount" 
+                type="number" 
+                value={amount} 
+                onChange={(e) => setAmount(e.target.value)} 
+                required 
+              />
             </div>
             <div>
               <label htmlFor="bank" className="block text-sm font-medium text-gray-700">
-                Bank
+                Select Bank Account
               </label>
-              <Select onValueChange={setBank} required>
+              <Select onValueChange={setSelectedBank} value={selectedBank}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select a bank" />
+                  <SelectValue placeholder="Select a bank account" />
                 </SelectTrigger>
                 <SelectContent>
-                  {banks.map((bank) => (
-                    <SelectItem key={bank.id} value={bank.name}>
-                      {bank.name}
+                  {banks.map((account) => (
+                    <SelectItem key={account.id} value={account.id}>
+                      {account.bank.name} - {account.account_number}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <label htmlFor="accountNumber" className="block text-sm font-medium text-gray-700">
-                Account Number
-              </label>
-              <Input
-                id="accountNumber"
-                value={accountNumber}
-                onChange={(e) => setAccountNumber(e.target.value)}
-                required
-              />
-            </div>
-            <div>
-              <label htmlFor="accountHolderName" className="block text-sm font-medium text-gray-700">
-                Account Holder's Name
-              </label>
-              <Input
-                id="accountHolderName"
-                value={accountHolderName}
-                onChange={(e) => setAccountHolderName(e.target.value)}
-                required
-              />
-            </div>
-            <Button type="submit">Submit Withdrawal Request</Button>
+            <Button type="submit" disabled={loading}>
+              {loading ? "Processing..." : "Submit Withdrawal Request"}
+            </Button>
           </form>
         </CardContent>
       </Card>
@@ -101,20 +171,29 @@ export default function WithdrawPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Amount (ETB)</TableHead>
-                <TableHead>Status</TableHead>
                 <TableHead>Date</TableHead>
+                <TableHead>Amount</TableHead>
+                <TableHead>Status</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {/* Backend Integration: Fetch Withdrawal History data from backend API */}
-              {withdrawalHistory.map((withdrawal) => (
-                <TableRow key={withdrawal.id}>
-                  <TableCell>{withdrawal.amount}</TableCell>
-                  <TableCell>{withdrawal.status}</TableCell>
-                  <TableCell>{withdrawal.date}</TableCell>
+              {withdrawals.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={3} className="text-center">
+                    No withdrawal history
+                  </TableCell>
                 </TableRow>
-              ))}
+              ) : (
+                withdrawals.map((withdrawal) => (
+                  <TableRow key={withdrawal.id}>
+                    <TableCell>
+                      {new Date(withdrawal.created_at).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell>{withdrawal.amount}</TableCell>
+                    <TableCell>{withdrawal.status}</TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>
@@ -122,4 +201,3 @@ export default function WithdrawPage() {
     </div>
   )
 }
-
