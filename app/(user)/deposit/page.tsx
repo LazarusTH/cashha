@@ -1,83 +1,95 @@
-"use client"
-// Backend Integration: This entire file needs to be connected to a backend API to fetch real data and handle deposit requests.
-
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-// Backend Integration: This is a mock data. It needs to be replaced with real data fetched from the backend.
-
-
-// Mock data
-const depositHistory = [
-  { id: 1, amount: 1000, status: "Completed", date: "2023-06-01" },
-  { id: 2, amount: 500, status: "Pending", date: "2023-06-05" },
-]
+import { useState } from 'react'
+import { useToast } from '@/components/ui/use-toast'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Label } from '@/components/ui/label'
 
 export default function DepositPage() {
-  const [amount, setAmount] = useState("")
-  const [receipt, setReceipt] = useState<File | null>(null)
+  const [amount, setAmount] = useState('')
+  const [fullName, setFullName] = useState('')
+  const [loading, setLoading] = useState(false)
+  const { toast } = useToast()
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // Backend Integration: Handle the deposit request, including amount and receipt.
-    console.log("Deposit request:", { amount, receipt })
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+
+    try {
+      const response = await fetch('/api/deposit', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ amount: Number(amount), fullName }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to process deposit')
+      }
+
+      toast({
+        title: 'Success',
+        description: 'Your deposit request has been submitted successfully.',
+      })
+
+      // Reset form
+      setAmount('')
+      setFullName('')
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to process deposit',
+        variant: 'destructive',
+      })
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-bold">Deposit</h1>
+    <div className="container mx-auto py-10">
       <Card>
         <CardHeader>
-          <CardTitle>Request Deposit</CardTitle>
+          <CardTitle>Make a Deposit</CardTitle>
+          <CardDescription>
+            Enter your deposit details below. Once submitted, an admin will review your request.
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label htmlFor="amount" className="block text-sm font-medium text-gray-700">
-                Amount (ETB)
-              </label>
-              <Input id="amount" type="number" value={amount} onChange={(e) => setAmount(e.target.value)} required />
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="fullName">Full Name</Label>
+              <Input
+                id="fullName"
+                type="text"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="Enter your full name"
+                required
+              />
             </div>
-            <div>
-              <label htmlFor="receipt" className="block text-sm font-medium text-gray-700">
-                Upload Receipt
-              </label>
-              <Input id="receipt" type="file" onChange={(e) => setReceipt(e.target.files?.[0] || null)} required />
+            <div className="space-y-2">
+              <Label htmlFor="amount">Amount</Label>
+              <Input
+                id="amount"
+                type="number"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="Enter amount to deposit"
+                min="0"
+                step="0.01"
+                required
+              />
             </div>
-            <Button type="submit">Submit Deposit Request</Button>
+            <Button type="submit" disabled={loading} className="w-full">
+              {loading ? 'Processing...' : 'Submit Deposit Request'}
+            </Button>
           </form>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader>
-          <CardTitle>Deposit History</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                 {/* Backend Integration: fetch data from backend */}
-                <TableHead>Amount (ETB)</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Date</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {depositHistory.map((deposit) => (
-                // Backend Integration: Replace `depositHistory` with the actual data fetched from backend API
-                <TableRow key={deposit.id}>
-                  <TableCell>{deposit.amount}</TableCell>
-                  <TableCell>{deposit.status}</TableCell>
-                  <TableCell>{deposit.date}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
         </CardContent>
       </Card>
     </div>
   )
 }
-

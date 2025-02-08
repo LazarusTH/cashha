@@ -1,63 +1,149 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { withAdmin } from '@/middleware/admin'
-import { logAdminAction } from '@/lib/utils/audit-logger'
-import { rateLimit } from '@/lib/utils/rate-limit'
+import { createClient } from '@/lib/supabase/server'
+import { cookies } from 'next/headers'
 
-export const GET = withAdmin(async (req: Request, user: any) => {
-  const rateLimitResponse = await rateLimit(req.headers.get('x-forwarded-for') || 'unknown')
-  if (rateLimitResponse) return rateLimitResponse
-
-  const supabase = createRouteHandlerClient({ cookies })
-
+export async function GET(request: Request) {
   try {
-    const { data: settings, error } = await supabase
-      .from('admin_settings')
+    const supabase = createClient(cookies())
+
+    // Get user session and verify admin role
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+
+    // Verify admin role
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', session.user.id)
+      .single()
+
+    if (!profile || profile.role !== 'admin') {
+      return NextResponse.json(
+        { error: 'Unauthorized - Admin access required' },
+        { status: 403 }
+      )
+    }
+
+    // Get system settings
+    const { data: settings, error: settingsError } = await supabase
+      .from('system_settings')
       .select('*')
       .single()
 
-    if (error) throw error
+    if (settingsError) {
+      console.error('Settings fetch error:', settingsError)
+      return NextResponse.json(
+        { error: 'Failed to fetch settings' },
+        { status: 500 }
+      )
+    }
 
     return NextResponse.json(settings)
+
   } catch (error) {
-    console.error('Error fetching admin settings:', error)
-    return new NextResponse(JSON.stringify({ error: 'Failed to fetch settings' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    })
+    console.error('Settings fetch error:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
   }
-})
+}
 
-export const PUT = withAdmin(async (req: Request, user: any) => {
-  const rateLimitResponse = await rateLimit(req.headers.get('x-forwarded-for') || 'unknown', 50)
-  if (rateLimitResponse) return rateLimitResponse
-
-  const supabase = createRouteHandlerClient({ cookies })
-
+export async function PUT(request: Request) {
   try {
-    const updates = await req.json()
+    const supabase = createClient(cookies())
 
-    const { data: settings, error } = await supabase
-      .from('admin_settings')
-      .update(updates)
+    // Get user session and verify admin role
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+
+    // Verify admin role
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', session.user.id)
+      .single()
+
+    if (!profile || profile.role !== 'admin') {
+      return NextResponse.json(
+        { error: 'Unauthorized - Admin access required' },
+        { status: 403 }
+      )
+    }
+
+    const updates = await request.json()
+
+    // Validate required fields
+    if (typeof updates.generalWithdrawalLimit !== 'string' ||
+        typeof updates.generalSendingLimit !== 'string' ||
+        typeof updates.maintenanceMode !== 'boolean') {
+      return NextResponse.json(
+        { error: 'Invalid settings format' },
+        { status: 400 }
+      )
+    }
+
+    // Convert limits to numbers and validate
+    const withdrawalLimit = parseFloat(updates.generalWithdrawalLimit)
+    const sendingLimit = parseFloat(updates.generalSendingLimit)
+
+    if (isNaN(withdrawalLimit) || isNaN(sendingLimit) || 
+        withdrawalLimit < 0 || sendingLimit < 0) {
+      return NextResponse.json(
+        { error: 'Invalid limit values' },
+        { status: 400 }
+      )
+    }
+
+    // Update settings
+    const { data: settings, error: updateError } = await supabase
+      .from('system_settings')
+      .update({
+        general_withdrawal_limit: withdrawalLimit,
+        general_sending_limit: sendingLimit,
+        maintenance_mode: updates.maintenanceMode,
+        updated_at: new Date().toISOString(),
+        updated_by: session.user.id
+      })
+      .eq('id', 1) // Assuming we have a single settings record
       .select()
       .single()
 
-    if (error) throw error
+    if (updateError) {
+      console.error('Settings update error:', updateError)
+      return NextResponse.json(
+        { error: 'Failed to update settings' },
+        { status: 500 }
+      )
+    }
 
-    // Log action
-    await logAdminAction(user.id, 'UPDATE_ADMIN_SETTINGS', {
-      updates,
-      timestamp: new Date().toISOString()
+    // Log activity
+    await supabase.from('activity_logs').insert({
+      user_id: session.user.id,
+      type: 'settings_update',
+      metadata: {
+        changes: Object.keys(updates).join(', '),
+        timestamp: new Date().toISOString()
+      }
     })
 
     return NextResponse.json(settings)
+
   } catch (error) {
-    console.error('Error updating admin settings:', error)
-    return new NextResponse(JSON.stringify({ error: 'Failed to update settings' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    })
+    console.error('Settings update error:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
   }
-})
+}

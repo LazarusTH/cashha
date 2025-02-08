@@ -1,106 +1,125 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { rateLimit } from '@/lib/utils/rate-limit'
+import { createClient } from '@/lib/supabase/server'
+import { cookies } from 'next/headers'
 
-export async function GET(req: Request) {
-  const rateLimitResponse = await rateLimit(req.headers.get('x-forwarded-for') || 'unknown')
-  if (rateLimitResponse) return rateLimitResponse
-
+export async function POST(request: Request) {
   try {
-    const supabase = createRouteHandlerClient({ cookies })
+    const supabase = createClient(cookies())
+    const { content } = await request.json()
 
-    // Get user from session
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return new NextResponse(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
+    if (!content?.trim()) {
+      return NextResponse.json(
+        { error: 'Message content is required' },
+        { status: 400 }
+      )
     }
 
-    // Get chat history
-    const { data: messages, error } = await supabase
+    // Get user session
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+
+    // Create support message
+    const { data: message, error: messageError } = await supabase
       .from('support_messages')
-      .select(`
-        id,
-        sender_id,
-        sender_type,
-        content,
-        read,
-        created_at,
-        sender:profiles!sender_id(full_name, email)
-      `)
-      .or(`sender_id.eq.${user.id},recipient_id.eq.${user.id}`)
-      .order('created_at', { ascending: true })
+      .insert({
+        user_id: session.user.id,
+        content: content,
+        sender: 'user'
+      })
+      .select()
+      .single()
 
-    if (error) throw error
+    if (messageError) {
+      console.error('Support message error:', messageError)
+      return NextResponse.json(
+        { error: 'Failed to send message' },
+        { status: 500 }
+      )
+    }
 
-    return NextResponse.json({ messages })
-  } catch (error: any) {
-    console.error('Support messages fetch error:', error)
-    return new NextResponse(JSON.stringify({ 
-      error: error.message || 'Failed to fetch messages' 
-    }), { status: 500 })
+    // Create auto-reply message
+    const { data: autoReply, error: replyError } = await supabase
+      .from('support_messages')
+      .insert({
+        user_id: session.user.id,
+        content: 'Thank you for your message. Our support team will get back to you shortly.',
+        sender: 'support'
+      })
+      .select()
+      .single()
+
+    if (replyError) {
+      console.error('Auto-reply error:', replyError)
+    }
+
+    // Create notification for support team
+    await supabase
+      .from('notifications')
+      .insert({
+        user_id: session.user.id,
+        type: 'support_message',
+        title: 'New Support Message',
+        content: `New support message from ${session.user.email}`,
+        metadata: {
+          message_id: message.id
+        }
+      })
+
+    return NextResponse.json({ 
+      success: true,
+      message,
+      autoReply
+    })
+
+  } catch (error) {
+    console.error('Support message error:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
   }
 }
 
-export async function POST(req: Request) {
-  const rateLimitResponse = await rateLimit(req.headers.get('x-forwarded-for') || 'unknown')
-  if (rateLimitResponse) return rateLimitResponse
-
+export async function GET(request: Request) {
   try {
-    const supabase = createRouteHandlerClient({ cookies })
-    const { content } = await req.json()
+    const supabase = createClient(cookies())
 
-    // Get user from session
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return new NextResponse(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
+    // Get user session
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
     }
 
-    // Create message
-    const { data: message, error } = await supabase
+    // Get all messages for the user
+    const { data: messages, error: messagesError } = await supabase
       .from('support_messages')
-      .insert({
-        sender_id: user.id,
-        sender_type: 'user',
-        content,
-        read: false
-      })
-      .select(`
-        id,
-        sender_id,
-        sender_type,
-        content,
-        read,
-        created_at,
-        sender:profiles!sender_id(full_name, email)
-      `)
-      .single()
+      .select()
+      .eq('user_id', session.user.id)
+      .order('created_at', { ascending: true })
 
-    if (error) throw error
-
-    // Auto-reply if outside business hours
-    const now = new Date()
-    const hour = now.getHours()
-    const isBusinessHours = hour >= 9 && hour < 17
-    
-    if (!isBusinessHours) {
-      const { error: autoReplyError } = await supabase
-        .from('support_messages')
-        .insert({
-          sender_type: 'system',
-          content: 'Thank you for your message. Our support team is available during business hours (9 AM - 5 PM). We will get back to you as soon as possible.',
-          read: true,
-          recipient_id: user.id
-        })
-
-      if (autoReplyError) throw autoReplyError
+    if (messagesError) {
+      console.error('Support messages fetch error:', messagesError)
+      return NextResponse.json(
+        { error: 'Failed to fetch messages' },
+        { status: 500 }
+      )
     }
 
-    return NextResponse.json({ message })
-  } catch (error: any) {
-    console.error('Support message send error:', error)
-    return new NextResponse(JSON.stringify({ 
-      error: error.message || 'Failed to send message' 
-    }), { status: 500 })
+    return NextResponse.json(messages)
+
+  } catch (error) {
+    console.error('Support messages fetch error:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
   }
 }

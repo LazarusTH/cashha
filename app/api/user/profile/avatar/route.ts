@@ -1,77 +1,202 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { withAuth } from '@/middleware/auth'
-import { rateLimit } from '@/lib/utils/rate-limit'
+import { createClient } from '@/lib/supabase/server'
+import { cookies } from 'next/headers'
 
-export const POST = withAuth(async (req: Request) => {
-  const rateLimitResponse = await rateLimit(req.headers.get('x-forwarded-for') || 'unknown')
-  if (rateLimitResponse) return rateLimitResponse
-
+export async function POST(request: Request) {
   try {
-    const supabase = createRouteHandlerClient({ cookies })
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return new NextResponse(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
+    const supabase = createClient(cookies())
+
+    // Get user session
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
     }
 
-    const formData = await req.formData()
-    const file = formData.get('file') as File
-    
+    // Get form data
+    const formData = await request.formData()
+    const file = formData.get('avatar') as File
+
     if (!file) {
-      return new NextResponse(JSON.stringify({ 
-        error: 'No file provided' 
-      }), { status: 400 })
+      return NextResponse.json(
+        { error: 'No file provided' },
+        { status: 400 }
+      )
     }
 
     // Validate file type
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif']
-    if (!allowedTypes.includes(file.type)) {
-      return new NextResponse(JSON.stringify({ 
-        error: 'Invalid file type. Only JPEG, PNG and GIF images are allowed.' 
-      }), { status: 400 })
+    if (!file.type.startsWith('image/')) {
+      return NextResponse.json(
+        { error: 'File must be an image' },
+        { status: 400 }
+      )
     }
 
     // Validate file size (max 5MB)
-    const maxSize = 5 * 1024 * 1024 // 5MB in bytes
-    if (file.size > maxSize) {
-      return new NextResponse(JSON.stringify({ 
-        error: 'File size too large. Maximum size is 5MB.' 
-      }), { status: 400 })
+    if (file.size > 5 * 1024 * 1024) {
+      return NextResponse.json(
+        { error: 'File size must be less than 5MB' },
+        { status: 400 }
+      )
     }
 
-    // Upload to storage
-    const fileExt = file.name.split('.').pop()
-    const fileName = `${user.id}-${Date.now()}.${fileExt}`
+    // Upload avatar to storage
+    const fileName = `${session.user.id}-${Date.now()}.${file.type.split('/')[1]}`
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('avatars')
       .upload(fileName, file)
 
-    if (uploadError) throw uploadError
+    if (uploadError) {
+      console.error('Avatar upload error:', uploadError)
+      return NextResponse.json(
+        { error: 'Failed to upload avatar' },
+        { status: 500 }
+      )
+    }
 
     // Get public URL
     const { data: { publicUrl } } = supabase.storage
       .from('avatars')
       .getPublicUrl(fileName)
 
-    // Update user profile
-    const { data: profile, error: profileError } = await supabase
+    // Update profile with new avatar URL
+    const { data: profile, error: updateError } = await supabase
       .from('profiles')
       .update({
         avatar_url: publicUrl,
         updated_at: new Date().toISOString()
       })
-      .eq('id', user.id)
+      .eq('id', session.user.id)
       .select()
       .single()
 
-    if (profileError) throw profileError
+    if (updateError) {
+      console.error('Profile update error:', updateError)
+      return NextResponse.json(
+        { error: 'Failed to update profile' },
+        { status: 500 }
+      )
+    }
 
-    return NextResponse.json({ profile })
-  } catch (error: any) {
+    // Delete old avatar if exists
+    if (profile.avatar_url && profile.avatar_url !== publicUrl) {
+      const oldFileName = profile.avatar_url.split('/').pop()
+      if (oldFileName) {
+        const { error: deleteError } = await supabase.storage
+          .from('avatars')
+          .remove([oldFileName])
+
+        if (deleteError) {
+          console.error('Old avatar deletion error:', deleteError)
+        }
+      }
+    }
+
+    // Log activity
+    await supabase.from('activity_logs').insert({
+      user_id: session.user.id,
+      type: 'avatar_update',
+      metadata: {
+        timestamp: new Date().toISOString()
+      }
+    })
+
+    return NextResponse.json({
+      avatar_url: publicUrl
+    })
+
+  } catch (error) {
     console.error('Avatar upload error:', error)
-    return new NextResponse(JSON.stringify({ 
-      error: error.message || 'Failed to upload avatar' 
-    }), { status: 500 })
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
   }
-})
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const supabase = createClient(cookies())
+
+    // Get user session
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+
+    // Get current profile
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('avatar_url')
+      .eq('id', session.user.id)
+      .single()
+
+    if (profileError) {
+      console.error('Profile fetch error:', profileError)
+      return NextResponse.json(
+        { error: 'Failed to fetch profile' },
+        { status: 500 }
+      )
+    }
+
+    // Delete avatar from storage if exists
+    if (profile.avatar_url) {
+      const fileName = profile.avatar_url.split('/').pop()
+      if (fileName) {
+        const { error: deleteError } = await supabase.storage
+          .from('avatars')
+          .remove([fileName])
+
+        if (deleteError) {
+          console.error('Avatar deletion error:', deleteError)
+          return NextResponse.json(
+            { error: 'Failed to delete avatar' },
+            { status: 500 }
+          )
+        }
+      }
+    }
+
+    // Update profile to remove avatar URL
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update({
+        avatar_url: null,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', session.user.id)
+
+    if (updateError) {
+      console.error('Profile update error:', updateError)
+      return NextResponse.json(
+        { error: 'Failed to update profile' },
+        { status: 500 }
+      )
+    }
+
+    // Log activity
+    await supabase.from('activity_logs').insert({
+      user_id: session.user.id,
+      type: 'avatar_delete',
+      metadata: {
+        timestamp: new Date().toISOString()
+      }
+    })
+
+    return NextResponse.json({
+      message: 'Avatar deleted successfully'
+    })
+
+  } catch (error) {
+    console.error('Avatar deletion error:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}

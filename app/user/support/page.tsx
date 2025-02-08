@@ -1,103 +1,136 @@
-"use client"
-// Backend Integration: This page needs to be integrated with a backend API to fetch real-time chat messages and handle user-support interactions.
-// The backend should provide endpoints to manage chat history, send messages, and handle auto-replies or human agent interactions.
+'use client'
 
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { ScrollArea } from "@/components/ui/scroll-area"
+import { useState, useEffect } from 'react'
+import { useToast } from '@/components/ui/use-toast'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { ScrollArea } from '@/components/ui/scroll-area'
 
-type Message = {
+interface Message {
   id: number
-  sender: "user" | "support"
   content: string
-  timestamp: string
+  sender: 'user' | 'support'
+  created_at: string
 }
 
-// Mock chat messages
-const initialMessages: Message[] = [
-  { id: 1, sender: "support", content: "Hello! How can I assist you today?", timestamp: "14:00" },
-]
-
 export default function SupportPage() {
-  const [messages, setMessages] = useState<Message[]>(initialMessages)
-  const [newMessage, setNewMessage] = useState("")
+  const [messages, setMessages] = useState<Message[]>([])
+  const [newMessage, setNewMessage] = useState('')
+  const [loading, setLoading] = useState(false)
+  const { toast } = useToast()
+
+  // Fetch message history
+  useEffect(() => {
+    fetchMessages()
+  }, [])
+
+  const fetchMessages = async () => {
+    try {
+      const response = await fetch('/api/support/messages')
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch messages')
+      }
+
+      setMessages(data)
+    } catch (error) {
+      console.error('Error fetching messages:', error)
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to fetch messages',
+        variant: 'destructive',
+      })
+    }
+  }
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newMessage.trim()) return
 
-    const userMessage: Message = {
-      id: messages.length + 1,
-      sender: "user",
-      content: newMessage,
-      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-    }
+    setLoading(true)
+    try {
+      const response = await fetch('/api/support/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ content: newMessage }),
+      })
 
-    setMessages((prevMessages) => [...prevMessages, userMessage])
-    setNewMessage("")
+      const data = await response.json()
 
-    // Backend Integration: Send the user message to the backend and get a reply.
-    setTimeout(() => {
-      const autoReply: Message = {
-        id: messages.length + 2,
-        sender: "support",
-        content: getAutoReply(newMessage),
-        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to send message')
       }
-      setMessages((prevMessages) => [...prevMessages, autoReply])
-    }, 1000)
-  }
 
-  // Backend Integration: Replace the auto-reply logic to use real data from database
-  const getAutoReply = (message: string) => {
-    if (message.toLowerCase().includes("deposit")) {
-      return "To make a deposit, please go to the Deposit page and follow the instructions there. If you have any specific questions about deposits, feel free to ask."
-    } else if (message.toLowerCase().includes("withdraw")) {
-      return "For withdrawals, please visit the Withdraw page. Make sure you have sufficient balance and your account is verified. Let me know if you need more information."
-    } else if (message.toLowerCase().includes("send")) {
-      return "You can send money to other users from the Send Money page. You'll need the recipient's username or email address. Is there anything specific you'd like to know about sending money?"
-    } else {
-      return "Thank you for your message. A support representative will get back to you shortly. Is there anything else I can help you with in the meantime?"
+      // Add both the user message and auto-reply to the chat
+      setMessages(prev => [...prev, data.message, data.autoReply])
+      setNewMessage('')
+
+    } catch (error) {
+      console.error('Error sending message:', error)
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to send message',
+        variant: 'destructive',
+      })
+    } finally {
+      setLoading(false)
     }
   }
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Customer Support</h1>
-
-      <Card className="h-[600px] flex flex-col">
+    <div className="container mx-auto py-10">
+      <Card>
         <CardHeader>
-          <CardTitle>Chat with Support</CardTitle>
+          <CardTitle>Support Chat</CardTitle>
+          <CardDescription>
+            Chat with our support team. We typically respond within 1-2 business hours.
+          </CardDescription>
         </CardHeader>
-        <CardContent className="flex-grow flex flex-col">
-          <ScrollArea className="flex-grow mb-4">
-            {messages.map((message) => (
-              <div key={message.id} className={`mb-4 ${message.sender === "user" ? "text-right" : "text-left"}`}>
-                <div
-                  className={`inline-block p-2 rounded-lg ${
-                    message.sender === "user" ? "bg-blue-500 text-white" : "bg-gray-200 text-gray-800"
-                  }`}
-                >
-                  {message.content}
-                </div>
-                <div className="text-xs text-gray-500 mt-1">{message.timestamp}</div>
+        <CardContent>
+          <div className="space-y-4">
+            <ScrollArea className="h-[400px] p-4 border rounded-lg">
+              <div className="space-y-4">
+                {messages.map((message) => (
+                  <div
+                    key={message.id}
+                    className={`flex ${
+                      message.sender === 'user' ? 'justify-end' : 'justify-start'
+                    }`}
+                  >
+                    <div
+                      className={`max-w-[80%] rounded-lg p-3 ${
+                        message.sender === 'user'
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-muted'
+                      }`}
+                    >
+                      <p>{message.content}</p>
+                      <p className="text-xs mt-1 opacity-70">
+                        {new Date(message.created_at).toLocaleTimeString()}
+                      </p>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </ScrollArea>
-          <form onSubmit={handleSendMessage} className="flex">
-            <Input
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              placeholder="Type your message here..."
-              className="flex-grow mr-2"
-            />
-            <Button type="submit">Send</Button>
-          </form>
+            </ScrollArea>
+            <form onSubmit={handleSendMessage} className="flex gap-2">
+              <Input
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                placeholder="Type your message..."
+                disabled={loading}
+              />
+              <Button type="submit" disabled={loading}>
+                {loading ? 'Sending...' : 'Send'}
+              </Button>
+            </form>
+          </div>
         </CardContent>
       </Card>
     </div>
   )
 }
-
