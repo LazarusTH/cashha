@@ -1,18 +1,18 @@
 "use client"
 
-import { Card, CardContent, CardHeader, CardTitle } from "components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Line, LineChart } from "recharts"
 import { ArrowUpIcon, ArrowDownIcon, ArrowRightIcon, WalletIcon } from "lucide-react"
 import { useDashboardData } from "@/lib/hooks/use-dashboard-data"
 import { useTransactionSubscription } from "@/lib/hooks/use-transaction-subscription"
-import { Skeleton } from "components/ui/skeleton"
-import { Alert, AlertDescription, AlertTitle } from "components/ui/alert"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { supabase } from "@/lib/supabase"
 import { useEffect, useState } from "react"
 import { useRouter } from "next/router"
-import { Progress, ScrollArea, Badge } from "components/ui/scroll-area"
-import { Button } from "components/ui/Button"
-import { useToast } from "components/ui/use-toast";
+import { Progress, ScrollArea, Badge } from "@/components/ui/scroll-area"
+import { Button } from "@/components/ui/button"
+import { useToast } from "@/components/ui/use-toast";
 
 interface MetricCardProps { 
   title: string
