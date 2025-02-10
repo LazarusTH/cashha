@@ -1,19 +1,19 @@
 "use client";
 
 import AdminSidebar from "@/components/admin/AdminSidebar"
-import { usePathname } from "next/navigation"
 import type React, { useEffect } from "react"
 import { DashboardLayout } from "@/components/dashboard/layout"
 import { supabase } from "@/lib/supabase"
-import { useRouter } from "next/router"
-import toast from "@/components/toast"
+import { useRouter } from "next/navigation"
+import { useToast } from "@/components/ui/use-toast";
 
-export default function AdminLayout({
+  export default function AdminLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
   const router = useRouter()
+  const { toast } = useToast()
 
   useEffect(() => {
     const checkSession = async () => {

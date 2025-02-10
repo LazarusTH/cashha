@@ -3,10 +3,11 @@
 import type React, { useState, useEffect } from "react"
 import { DashboardLayout } from "@/components/dashboard/layout"
 import { supabase } from "@/lib/supabase"
-import { toast } from "@/components/toast"
-import { Button } from "@/components/button"
+import { useToast } from "@/components/ui/use-toast";
+import { Button } from "@/components/ui/Button";
 import { useRouter } from "next/router"
 
+const { toast } = useToast();
 export default function UserLayout({
   children,
 }: {

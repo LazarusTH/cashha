@@ -1,18 +1,20 @@
 "use client"
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "components/ui/card"
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Line, LineChart } from "recharts"
 import { ArrowUpIcon, ArrowDownIcon, ArrowRightIcon, WalletIcon } from "lucide-react"
 import { useDashboardData } from "@/lib/hooks/use-dashboard-data"
 import { useTransactionSubscription } from "@/lib/hooks/use-transaction-subscription"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Skeleton } from "components/ui/skeleton"
+import { Alert, AlertDescription, AlertTitle } from "components/ui/alert"
 import { supabase } from "@/lib/supabase"
 import { useEffect, useState } from "react"
 import { useRouter } from "next/router"
-import { toast, Button, Progress, ScrollArea, Badge } from "@/components/ui"
+import { Progress, ScrollArea, Badge } from "components/ui/scroll-area"
+import { Button } from "components/ui/Button"
+import { useToast } from "components/ui/use-toast";
 
-interface MetricCardProps {
+interface MetricCardProps { 
   title: string
   value: string
   icon: React.ReactNode
@@ -38,6 +40,7 @@ function MetricCard({ title, value, icon, loading }: MetricCardProps) {
 }
 
 export default function UserDashboard() {
+  const { toast } = useToast();
   const { data, loading, error, refetch } = useDashboardData()
   const [userStatus, setUserStatus] = useState<'active' | 'blocked' | 'pending'>('active')
   const [verificationStatus, setVerificationStatus] = useState<'verified' | 'pending' | 'rejected'>('pending')

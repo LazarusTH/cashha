@@ -1,8 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { useAuth } from '@/lib/supabase/auth-context'
-import toast from '@/lib/toast'
+import { useAuth } from '@/lib/supabase/auth-context';
+import { useToast } from '@/components/ui/use-toast';
 
 export interface WithdrawFormData {
   amount: number
@@ -15,6 +15,7 @@ export interface WithdrawFormData {
 export function useWithdraw() {
   const { user } = useAuth()
   const [loading, setLoading] = useState(false)
+  const { toast } = useToast();
   const [history, setHistory] = useState<any[]>([])
   const [historyLoading, setHistoryLoading] = useState(true)
 

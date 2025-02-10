@@ -90,7 +90,7 @@ export const PUT = withAdmin(async (req: Request) => {
     })
 
     return NextResponse.json({
-      message: 'Withdrawal request rejected successfully',
+      message: 'withdrawal request rejected successfully',
       withdrawal: updatedWithdrawal
     })
   } catch (error: any) {

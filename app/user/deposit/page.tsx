@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useDeposit } from "@/lib/hooks/use-deposit"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import toast from "@/lib/toast"
+import { useToast } from "@/components/ui/use-toast"
 
 export default function DepositPage() {
   const [fullName, setFullName] = useState("")
@@ -16,6 +16,7 @@ export default function DepositPage() {
   const [paymentMethod, setPaymentMethod] = useState("")
   const [description, setDescription] = useState("")
   const { submitDeposit, loading, history, historyLoading, fetchHistory } = useDeposit()
+  const { toast } = useToast()
 
   const [depositLimits, setDepositLimits] = useState({
     minAmount: 0,

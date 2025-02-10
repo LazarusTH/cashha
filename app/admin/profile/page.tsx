@@ -1,3 +1,5 @@
+"use client";
+
 // Backend Integration: This page is integrated with the backend API to manage admin profile data.
 
 import { useEffect, useState } from "react"

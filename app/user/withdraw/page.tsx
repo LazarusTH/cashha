@@ -1,8 +1,10 @@
 "use client"
 
+"use client"
+
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { Input } from "@/components/ui/input"import { useToast } from "@/components/ui/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -10,7 +12,8 @@ import { useWithdraw } from "@/lib/hooks/use-withdraw"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Textarea } from "@/components/ui/textarea"
-import toast from "@/lib/toast"
+
+
 
 // List of supported banks
 const SUPPORTED_BANKS = [
@@ -33,6 +36,8 @@ export default function WithdrawPage() {
   const [accountName, setAccountName] = useState("")
   const [description, setDescription] = useState("")
   const [withdrawalLimits, setWithdrawalLimits] = useState({
+
+  const { toast } = useToast()
     dailyLimit: 0,
     dailyUsed: 0,
     monthlyLimit: 0,

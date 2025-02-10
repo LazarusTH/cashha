@@ -111,7 +111,7 @@ export const PUT = withUser(async (req: Request, { params }: { params: { id: str
     })
 
     return NextResponse.json({
-      message: 'Transaction cancelled successfully'
+      message: 'transaction cancelled successfully'
     })
   } catch (error: any) {
     console.error('Transaction cancellation error:', error)

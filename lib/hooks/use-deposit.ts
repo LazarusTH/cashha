@@ -1,19 +1,22 @@
 'use client'
 
+'use client'
+
 import { useState } from 'react'
 import { useAuth } from '@/lib/supabase/auth-context'
-import toast from '@/lib/toast'
+import { useToast } from '@/components/ui/use-toast';
 
 export interface DepositFormData {
-  amount: number
-  paymentMethod: string
-  description?: string
+    amount: number
+    paymentMethod: string
+    description?: string
 }
 
 export function useDeposit() {
   const { user } = useAuth()
   const [loading, setLoading] = useState(false)
   const [history, setHistory] = useState<any[]>([])
+  const { toast } = useToast()
   const [historyLoading, setHistoryLoading] = useState(true)
 
   const submitDeposit = async (data: DepositFormData) => {
@@ -95,3 +98,4 @@ export function useDeposit() {
     fetchHistory,
   }
 }
+
