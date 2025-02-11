@@ -5,7 +5,16 @@ export type ProfileData = {
   email: string
   firstName: string
   lastName: string
-  role?: 'user' | 'admin'
+  phoneNumber: string
+  dateOfBirth: string
+  nationality: string
+  address: string
+  role: 'user' | 'admin'
+  idCardUrl: string
+  proofOfAddressUrl: string
+  referralCode?: string
+  status: 'pending_verification' | 'verified' | 'rejected'
+  createdAt: string
 }
 
 export async function createProfile(profileData: ProfileData) {
@@ -16,7 +25,16 @@ export async function createProfile(profileData: ProfileData) {
         id: profileData.id,
         email: profileData.email,
         full_name: `${profileData.firstName} ${profileData.lastName}`,
-        role: profileData.role || 'user',
+        role: profileData.role,
+        phoneNumber: profileData.phoneNumber,
+        dateOfBirth: profileData.dateOfBirth,
+        nationality: profileData.nationality,
+        address: profileData.address,
+        idCardUrl: profileData.idCardUrl,
+        proofOfAddressUrl: profileData.proofOfAddressUrl,
+        referralCode: profileData.referralCode,
+        status: profileData.status,
+        createdAt: profileData.createdAt,
       },
     ])
     .select()
@@ -45,6 +63,16 @@ export async function updateProfile(userId: string, updates: Partial<ProfileData
       ...(updates.firstName && updates.lastName && {
         full_name: `${updates.firstName} ${updates.lastName}`,
       }),
+      ...(updates.phoneNumber && { phoneNumber: updates.phoneNumber }),
+      ...(updates.dateOfBirth && { dateOfBirth: updates.dateOfBirth }),
+      ...(updates.nationality && { nationality: updates.nationality }),
+      ...(updates.address && { address: updates.address }),
+      ...(updates.role && { role: updates.role }),
+      ...(updates.idCardUrl && { idCardUrl: updates.idCardUrl }),
+      ...(updates.proofOfAddressUrl && { proofOfAddressUrl: updates.proofOfAddressUrl }),
+      ...(updates.referralCode && { referralCode: updates.referralCode }),
+      ...(updates.status && { status: updates.status }),
+      ...(updates.createdAt && { createdAt: updates.createdAt }),
     })
     .eq('id', userId)
     .select()

@@ -100,11 +100,7 @@ export default function SignIn() {
       }
 
       // Attempt login
-      const { data, error } = await signIn(
-        email, 
-        password, 
-        showTwoFactor ? twoFactorCode : undefined
-      )
+      const { data, error } = await signIn(email, password)
       
       if (error) {
         setLoginAttempts(prev => prev + 1)
@@ -140,18 +136,20 @@ export default function SignIn() {
       setBlockExpiry(null)
 
       // Log the successful login
-      await fetch('/api/auth/log-login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          userId: data.user?.id,
-          email,
-          ip: window.clientInformation?.userAgent,
-          timestamp: new Date().toISOString(),
-        }),
-      })
+      if (data?.user?.id) {
+        await fetch('/api/auth/log-login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            userId: data.user.id,
+            email,
+            ip: window.clientInformation?.userAgent,
+            timestamp: new Date().toISOString(),
+          }),
+        })
+      }
 
       toast({
         title: "Success",
@@ -159,8 +157,12 @@ export default function SignIn() {
       })
 
       // Redirect based on user role and verification status
-      const role = data.user?.user_metadata?.role || 'user'
-      const isVerified = data.user?.email_confirmed_at != null
+      if (!data || !data.user) {
+        throw new Error('No user data received after sign in')
+      }
+
+      const role = data.user.user_metadata?.role || 'user'
+      const isVerified = data.user.email_confirmed_at != null
 
       if (!isVerified) {
         router.push('/verify-email')
@@ -233,7 +235,10 @@ export default function SignIn() {
                   </div>
                 )}
 
-                <Button type="submit" disabled={loading || (isBlocked && blockExpiry && blockExpiry > new Date())}>
+                <Button 
+                  type="submit" 
+                  disabled={loading || (isBlocked && blockExpiry !== null && blockExpiry > new Date())}
+                >
                   {loading ? "Signing in..." : "Sign In"}
                 </Button>
 

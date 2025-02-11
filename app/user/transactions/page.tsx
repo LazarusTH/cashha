@@ -21,10 +21,21 @@ export default function TransactionHistoryPage() {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc")
 
   useEffect(() => {
-    if (!user) return
+    if (!user?.id) {
+      setLoading(false)
+      toast({
+        title: "Authentication Required",
+        description: "Please sign in to view your transaction history",
+        variant: "destructive",
+      })
+      return
+    }
 
     async function loadTransactions() {
       try {
+        if (!user) {
+          throw new Error('User not found')
+        }
         const data = await getUserTransactions(user.id, 100)
         setTransactions(data)
       } catch (error) {

@@ -12,6 +12,7 @@ import { signUp } from "@/lib/supabase/client"
 import { createProfile } from "@/lib/supabase/profile"
 import { useFormValidation } from "@/lib/hooks/use-form-validation"
 import { toast } from "@/components/ui/use-toast"
+import { validateFileUpload } from "@/lib/utils/validation"
 
 export default function SignUp() {
   const [formData, setFormData] = useState({
@@ -39,10 +40,7 @@ export default function SignUp() {
     validateEmail, 
     validatePassword, 
     validateName, 
-    validatePhone,
-    validateDate,
     validateAddress,
-    validateFileUpload,
     clearErrors 
   } = useFormValidation()
 
@@ -105,8 +103,6 @@ export default function SignUp() {
     const isPasswordValid = validatePassword(formData.password)
     const isFirstNameValid = validateName(formData.firstName, 'firstName')
     const isLastNameValid = validateName(formData.lastName, 'lastName')
-    const isPhoneValid = validatePhone(formData.phoneNumber)
-    const isDateValid = validateDate(formData.dateOfBirth)
     const isAddressValid = validateAddress(formData.address)
 
     if (formData.password !== formData.confirmPassword) {
@@ -128,7 +124,7 @@ export default function SignUp() {
     }
 
     if (!isEmailValid || !isPasswordValid || !isFirstNameValid || 
-        !isLastNameValid || !isPhoneValid || !isDateValid || !isAddressValid) {
+        !isLastNameValid || !isAddressValid) {
       return
     }
 
@@ -172,73 +168,66 @@ export default function SignUp() {
       if (error) throw error
 
       // Create user profile with all collected information
-      if (data.user) {
-        await createProfile({
-          id: data.user.id,
-          email: formData.email,
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-          phoneNumber: formData.phoneNumber,
-          dateOfBirth: formData.dateOfBirth,
-          nationality: formData.nationality,
-          address: formData.address,
-          role: 'user',
-          idCardUrl: documentUrls.idCard,
-          proofOfAddressUrl: documentUrls.proofOfAddress,
-          referralCode: formData.referralCode,
-          status: 'pending_verification',
-          createdAt: new Date().toISOString(),
-        })
+      if (!data || !data.user) {
+        throw new Error('Failed to create user account')
+      }
 
-        // Process referral if provided
-        if (formData.referralCode) {
-          await fetch('/api/referrals/process', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              referralCode: formData.referralCode,
-              newUserId: data.user.id,
-            }),
-          })
-        }
+      await createProfile({
+        id: data.user.id,
+        email: formData.email,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        phoneNumber: formData.phoneNumber,
+        dateOfBirth: formData.dateOfBirth,
+        nationality: formData.nationality,
+        address: formData.address,
+        role: 'user',
+        idCardUrl: documentUrls.idCard,
+        proofOfAddressUrl: documentUrls.proofOfAddress,
+        referralCode: formData.referralCode,
+        status: 'pending_verification',
+        createdAt: new Date().toISOString(),
+      })
 
-        // Send welcome email
-        await fetch('/api/email/send', {
+      // Process referral if provided
+      if (formData.referralCode) {
+        await fetch('/api/referrals/process', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            to: formData.email,
-            template: 'welcome',
-            data: {
-              name: `${formData.firstName} ${formData.lastName}`,
-            },
-          }),
-        })
-
-        // Notify admin of new registration
-        await fetch('/api/admin/notifications', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            type: 'new_user',
-            message: `New user registration: ${formData.email}`,
-            data: {
-              userId: data.user.id,
-              email: formData.email,
-              name: `${formData.firstName} ${formData.lastName}`,
-            },
+            referralCode: formData.referralCode,
+            newUserId: data.user.id,
           }),
         })
       }
 
-      setVerifyingEmail(true)
-      toast({
-        title: "Success",
-        description: "Account created successfully! Please check your email to verify your account.",
+      // Send welcome email
+      await fetch('/api/email/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: formData.email,
+          template: 'welcome',
+          data: {
+            name: `${formData.firstName} ${formData.lastName}`,
+          },
+        }),
       })
 
-      // Redirect to email verification page
-      router.push('/verify-email')
+      // Notify admin of new registration
+      await fetch('/api/admin/notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'new_user',
+          message: `New user registration: ${formData.email}`,
+          data: {
+            userId: data.user.id,
+            email: formData.email,
+            name: `${formData.firstName} ${formData.lastName}`,
+          },
+        }),
+      })
     } catch (error) {
       console.error('Sign up error:', error)
       toast({

@@ -1,10 +1,10 @@
 "use client";
 
-import type React, { useState, useEffect } from "react"
+import React, { useState, useEffect } from "react"
 import { DashboardLayout } from "@/components/dashboard/layout"
 import { supabase } from "@/lib/supabase"
 import { useToast } from "@/components/ui/use-toast";
-import { Button } from "@/components/ui/Button";
+import { Button } from "@/components/ui/button";
 import { useRouter } from "next/router"
 
 const { toast } = useToast();
@@ -51,7 +51,7 @@ export default function UserLayout({
           toast({
             title: 'Account Not Verified',
             description: 'Please verify your email address to continue.',
-            variant: 'warning',
+            variant: 'destructive',
           })
           router.push('/verify-email')
           return

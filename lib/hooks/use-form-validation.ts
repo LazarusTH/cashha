@@ -47,6 +47,32 @@ export function useFormValidation() {
     return true
   }
 
+  const validateTwoFactorCode = (code: string): boolean => {
+    if (!code) {
+      setErrors(prev => ({ ...prev, twoFactorCode: 'Two-factor code is required' }))
+      return false
+    }
+    if (!/^\d{6}$/.test(code)) {
+      setErrors(prev => ({ ...prev, twoFactorCode: 'Two-factor code must be 6 digits' }))
+      return false
+    }
+    setErrors(prev => ({ ...prev, twoFactorCode: '' }))
+    return true
+  }
+
+  const validateAddress = (address: string): boolean => {
+    if (!address) {
+      setErrors(prev => ({ ...prev, address: 'Address is required' }))
+      return false
+    }
+    if (address.length < 5) {
+      setErrors(prev => ({ ...prev, address: 'Address must be at least 5 characters' }))
+      return false
+    }
+    setErrors(prev => ({ ...prev, address: '' }))
+    return true
+  }
+
   const clearErrors = () => {
     setErrors({})
   }
@@ -56,6 +82,8 @@ export function useFormValidation() {
     validateEmail,
     validatePassword,
     validateName,
+    validateTwoFactorCode,
+    validateAddress,
     clearErrors,
   }
 }

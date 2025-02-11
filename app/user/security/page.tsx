@@ -52,8 +52,8 @@ export default async function SecurityPage() {
     <div className="container mx-auto py-8">
       <SecurityDashboard
         profile={profile}
-        loginAttempts={loginAttempts}
-        securityLogs={securityLogs}
+        loginAttempts={loginAttempts ?? []}
+        securityLogs={securityLogs ?? []}
       />
     </div>
   );

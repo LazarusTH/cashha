@@ -102,3 +102,21 @@ export function formatPhoneNumber(phone: string) {
   }
   return phone
 }
+
+export function validateFileUpload(file: File) {
+  // Maximum file size (5MB)
+  const MAX_FILE_SIZE = 5 * 1024 * 1024
+  
+  // Allowed file types
+  const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf']
+  
+  if (!ALLOWED_TYPES.includes(file.type)) {
+    throw new AppError('Invalid file type. Please upload a JPG, PNG, or PDF file.', 400)
+  }
+  
+  if (file.size > MAX_FILE_SIZE) {
+    throw new AppError('File size too large. Maximum size is 5MB.', 400)
+  }
+  
+  return true
+}

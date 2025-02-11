@@ -10,7 +10,8 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Textarea } from "@/components/ui/textarea"
 import debounce from 'lodash/debounce'
-import toast from "@/components/ui/toast"
+import { Toast } from "@/components/ui/toast"
+import { useToast } from "@/components/ui/use-toast"
 
 export default function SendPage() {
   const [recipient, setRecipient] = useState("")
@@ -18,6 +19,7 @@ export default function SendPage() {
   const [description, setDescription] = useState("")
   const [recipientDetails, setRecipientDetails] = useState<any>(null)
   const { submitTransfer, loading, history, historyLoading, fetchHistory, searchRecipient, recipientSearchLoading } = useTransfer()
+  const { toast } = useToast()
 
   const [userLimits, setUserLimits] = useState({
     dailyLimit: 0,

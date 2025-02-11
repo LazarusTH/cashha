@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { Loader2, Monitor, Smartphone, Laptop } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, fromUnixTime } from "date-fns";
 
 interface Device {
   id: string;
@@ -36,6 +36,23 @@ export default function DeviceHistory({ devices }: DeviceHistoryProps) {
       return <Laptop className="h-4 w-4" />;
     }
     return <Monitor className="h-4 w-4" />;
+  };
+
+  const getLastActive = (lastActive: string | null) => {
+    console.log(lastActive);
+    if (!lastActive) return "Never";
+    
+    // Convert to number and check if it's a Unix timestamp
+    const timestamp = Number(lastActive);
+    if (!isNaN(timestamp)) {
+      try {
+        const date = fromUnixTime(timestamp);
+        return formatDistanceToNow(date, { addSuffix: true });
+      } catch {
+        return "Unknown";
+      }
+    }
+    return "Unknown";
   };
 
   const handleRemoveDevice = async (deviceId: string) => {
@@ -112,9 +129,7 @@ export default function DeviceHistory({ devices }: DeviceHistoryProps) {
                 </p>
                 <p className="text-xs text-muted-foreground">
                   Last active{" "}
-                  {formatDistanceToNow(new Date(device.last_active), {
-                    addSuffix: true,
-                  })}
+                  {getLastActive(device.last_active)}
                 </p>
               </div>
             </div>
