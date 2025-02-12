@@ -1,11 +1,11 @@
-import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
+import { NextResponse } from 'next/server'
 
 export async function GET(request: Request) {
   try {
-    const supabase = createClient(cookies())
-
+    const supabase = createRouteHandlerClient({ cookies })
+    
     // Get user session and verify admin role
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) {
@@ -80,7 +80,7 @@ export async function GET(request: Request) {
     ])
 
     // Calculate total balance
-    const totalBalance = walletsResult.data?.reduce((sum, wallet) => 
+    const totalBalance = walletsResult.data?.reduce((sum: number, wallet: { balance: number }) => 
       sum + (wallet.balance || 0), 0) || 0
 
     // Get transaction stats for the last 30 days
@@ -93,7 +93,11 @@ export async function GET(request: Request) {
       .gte('created_at', thirtyDaysAgo.toISOString())
 
     // Calculate transaction metrics
-    const stats = transactionStats?.reduce((acc: any, tx) => {
+    const stats = transactionStats?.reduce((acc: any, tx: { 
+      status: string;
+      amount: number;
+      type: string;
+    }) => {
       if (tx.status === 'completed') {
         acc.total_volume += tx.amount
         acc[tx.type] = (acc[tx.type] || 0) + tx.amount
@@ -134,8 +138,8 @@ export async function GET(request: Request) {
 
 export async function PUT(request: Request) {
   try {
-    const supabase = createClient(cookies())
-
+    const supabase = createRouteHandlerClient({ cookies })
+    
     // Get user session and verify admin role
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) {

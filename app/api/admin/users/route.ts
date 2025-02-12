@@ -1,15 +1,16 @@
-import { createClient } from '@/lib/supabase/server'
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { withAdmin } from '@/middleware/admin'
 import { rateLimit } from '@/lib/utils/rate-limit'
+import { logAdminAction } from '@/lib/utils/audit-logger'
 
 export const GET = withAdmin(async (req: Request) => {
   const rateLimitResponse = await rateLimit(req.headers.get('x-forwarded-for') || 'unknown')
   if (rateLimitResponse) return rateLimitResponse
 
   try {
-    const supabase = createClient(cookies())
+    const supabase = createRouteHandlerClient({ cookies })
 
     // Get user session and verify admin role
     const { data: { session } } = await supabase.auth.getSession()
@@ -157,7 +158,7 @@ export const GET = withAdmin(async (req: Request) => {
 
 export async function POST(request: Request) {
   try {
-    const supabase = createClient(cookies())
+    const supabase = createRouteHandlerClient({ cookies })
 
     // Get user session and verify admin role
     const { data: { session } } = await supabase.auth.getSession()
@@ -261,16 +262,19 @@ export async function POST(request: Request) {
     }
 
     // Log activity
-    await supabase.from('activity_logs').insert({
-      user_id: session.user.id,
-      type: 'user_create',
-      metadata: {
+    await logAdminAction(
+      supabase,
+      session.user.id,
+      authData.user.id,  // target is the created user
+      'USER_CREATE',
+      JSON.stringify({
         user_id: authData.user.id,
         email,
         role,
         timestamp: new Date().toISOString()
-      }
-    })
+      }),
+      request.headers
+    )
 
     return NextResponse.json(newProfile)
 
@@ -285,7 +289,7 @@ export async function POST(request: Request) {
 
 export async function PUT(request: Request) {
   try {
-    const supabase = createClient(cookies())
+    const supabase = createRouteHandlerClient({ cookies })
 
     // Get user session and verify admin role
     const { data: { session } } = await supabase.auth.getSession()
@@ -356,15 +360,18 @@ export async function PUT(request: Request) {
     }
 
     // Log activity
-    await supabase.from('activity_logs').insert({
-      user_id: session.user.id,
-      type: 'user_update',
-      metadata: {
+    await logAdminAction(
+      supabase,
+      session.user.id,
+      id,  // target is the updated user
+      'USER_UPDATE',
+      JSON.stringify({
         user_id: id,
         changes: Object.keys(updates).join(', '),
         timestamp: new Date().toISOString()
-      }
-    })
+      }),
+      request.headers
+    )
 
     return NextResponse.json(updatedProfile)
 
@@ -379,7 +386,7 @@ export async function PUT(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
-    const supabase = createClient(cookies())
+    const supabase = createRouteHandlerClient({ cookies })
 
     // Get user session and verify admin role
     const { data: { session } } = await supabase.auth.getSession()
@@ -446,14 +453,17 @@ export async function DELETE(request: Request) {
     }
 
     // Log activity
-    await supabase.from('activity_logs').insert({
-      user_id: session.user.id,
-      type: 'user_delete',
-      metadata: {
+    await logAdminAction(
+      supabase,
+      session.user.id,
+      id,  // target is the deleted user
+      'USER_DELETE',
+      JSON.stringify({
         user_id: id,
         timestamp: new Date().toISOString()
-      }
-    })
+      }),
+      request.headers
+    )
 
     return NextResponse.json({
       message: 'User deleted successfully'

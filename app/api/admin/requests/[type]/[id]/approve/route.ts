@@ -69,12 +69,19 @@ export const PUT = withAdmin(async (req: Request, { params }: { params: { type: 
     if (notificationError) throw notificationError
 
     // Log action
-    await logAdminAction(user.id, `APPROVE_${params.type.toUpperCase()}_REQUEST`, {
-      requestId: params.id,
-      amount: request.amount,
-      note,
-      timestamp: new Date().toISOString()
-    })
+    await logAdminAction(
+      supabase,
+      user.id,
+      request.id,  // target is the request being approved
+      `APPROVE_${params.type.toUpperCase()}_REQUEST`,
+      JSON.stringify({
+        requestId: params.id,
+        amount: request.amount,
+        note,
+        timestamp: new Date().toISOString()
+      }),
+      req.headers
+    )
 
     return NextResponse.json({
       message: 'Request approved successfully'

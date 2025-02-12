@@ -30,7 +30,7 @@ export const GET = withAdmin(async (req: Request, user: any) => {
 })
 
 export const POST = withAdmin(async (req: Request, user: any) => {
-  const rateLimitResponse = await rateLimit(req.headers.get('x-forwarded-for') || 'unknown', 50)
+  const rateLimitResponse = await rateLimit(req.headers.get('x-forwarded-for') || 'unknown')
   if (rateLimitResponse) return rateLimitResponse
 
   const supabase = createRouteHandlerClient({ cookies })
@@ -47,11 +47,18 @@ export const POST = withAdmin(async (req: Request, user: any) => {
     if (error) throw error
 
     // Log action
-    await logAdminAction(user.id, 'CREATE_EMAIL_TEMPLATE', {
-      templateId: template.id,
-      templateName: template.name,
-      timestamp: new Date().toISOString()
-    })
+    await logAdminAction(
+      supabase,
+      user.id,
+      template.id,  // target id
+      'CREATE_EMAIL_TEMPLATE',
+      JSON.stringify({
+        templateId: template.id,
+        templateName: template.name,
+        timestamp: new Date().toISOString()
+      }),
+      req.headers
+    )
 
     return NextResponse.json(template)
   } catch (error) {

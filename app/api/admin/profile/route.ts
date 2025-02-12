@@ -88,10 +88,17 @@ export const PUT = withAdmin(async (req: Request) => {
     if (error) throw error
 
     // Log action
-    await logAdminAction(user.id, 'UPDATE_ADMIN_PROFILE', {
-      updates,
-      timestamp: new Date().toISOString()
-    })
+    await logAdminAction(
+      supabase,
+      user.id,
+      user.id,  // target is self
+      'UPDATE_ADMIN_PROFILE',
+      JSON.stringify({
+        updates,
+        timestamp: new Date().toISOString()
+      }),
+      req.headers
+    )
 
     return NextResponse.json(profile)
   } catch (error: any) {

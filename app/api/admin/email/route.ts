@@ -1,10 +1,10 @@
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { withAuth } from '@/middleware/auth'
+import { withAdmin } from '@/middleware/admin'
 import { rateLimit } from '@/lib/utils/rate-limit'
 
-export const GET = withAuth(async (req: Request) => {
+export const GET = withAdmin(async (req: Request) => {
   const rateLimitResponse = await rateLimit(req.headers.get('x-forwarded-for') || 'unknown')
   if (rateLimitResponse) return rateLimitResponse
 
@@ -51,7 +51,7 @@ export const GET = withAuth(async (req: Request) => {
   }
 })
 
-export const POST = withAuth(async (req: Request) => {
+export const POST = withAdmin(async (req: Request) => {
   const rateLimitResponse = await rateLimit(req.headers.get('x-forwarded-for') || 'unknown')
   if (rateLimitResponse) return rateLimitResponse
 

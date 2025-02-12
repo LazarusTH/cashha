@@ -70,10 +70,17 @@ export const DELETE = withAdmin(async (req: Request, { params }: { params: { id:
     if (authDeleteError) throw authDeleteError
 
     // Log action
-    await logAdminAction(user.id, 'DELETE_USER', {
-      userId: params.id,
-      timestamp: new Date().toISOString()
-    })
+    await logAdminAction(
+      supabase,
+      user.id,
+      params.id,  // target is the user being deleted
+      'DELETE_USER',
+      JSON.stringify({
+        userId: params.id,
+        timestamp: new Date().toISOString()
+      }),
+      req.headers
+    )
 
     return NextResponse.json({
       message: 'User deleted successfully'

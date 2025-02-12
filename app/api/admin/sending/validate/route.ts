@@ -5,7 +5,7 @@ import { withAdmin } from '@/middleware/admin'
 import { rateLimit } from '@/lib/utils/rate-limit'
 
 export const POST = withAdmin(async (req: Request, user: any) => {
-  const rateLimitResponse = await rateLimit(req.headers.get('x-forwarded-for') || 'unknown', 20)
+  const rateLimitResponse = await rateLimit(req.headers.get('x-forwarded-for') || 'unknown')
   if (rateLimitResponse) return rateLimitResponse
 
   const supabase = createRouteHandlerClient({ cookies })

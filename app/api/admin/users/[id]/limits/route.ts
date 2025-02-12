@@ -11,7 +11,7 @@ export const PUT = withAdmin(async (req: Request, { params }: { params: { id: st
 
   try {
     const supabase = createRouteHandlerClient({ cookies })
-    const { sendLimit, withdrawLimit, note } = await req.json()
+    const { dailyLimit, monthlyLimit, sendLimit, withdrawLimit, note } = await req.json()
 
     // Get user from session
     const { data: { user } } = await supabase.auth.getUser()
@@ -22,7 +22,7 @@ export const PUT = withAdmin(async (req: Request, { params }: { params: { id: st
     // Get user details
     const { data: profile, error: fetchError } = await supabase
       .from('profiles')
-      .select('send_limit, withdraw_limit')
+      .select('daily_limit, monthly_limit, send_limit, withdraw_limit')
       .eq('id', params.id)
       .single()
 
@@ -38,6 +38,8 @@ export const PUT = withAdmin(async (req: Request, { params }: { params: { id: st
     const { error: updateError } = await supabase
       .from('profiles')
       .update({
+        daily_limit: dailyLimit,
+        monthly_limit: monthlyLimit,
         send_limit: sendLimit,
         withdraw_limit: withdrawLimit,
         updated_at: new Date().toISOString()
@@ -60,19 +62,29 @@ export const PUT = withAdmin(async (req: Request, { params }: { params: { id: st
     if (notificationError) throw notificationError
 
     // Log action
-    await logAdminAction(user.id, 'UPDATE_USER_LIMITS', {
-      userId: params.id,
-      oldLimits: {
-        sendLimit: profile.send_limit,
-        withdrawLimit: profile.withdraw_limit
-      },
-      newLimits: {
-        sendLimit,
-        withdrawLimit
-      },
-      note,
-      timestamp: new Date().toISOString()
-    })
+    await logAdminAction(
+      supabase,
+      user.id,
+      params.id,  // target is the user whose limits are being updated
+      'UPDATE_USER_LIMITS',
+      JSON.stringify({
+        userId: params.id,
+        oldLimits: {
+          daily: profile.daily_limit,
+          monthly: profile.monthly_limit,
+          send: profile.send_limit,
+          withdraw: profile.withdraw_limit
+        },
+        newLimits: {
+          daily: dailyLimit,
+          monthly: monthlyLimit,
+          send: sendLimit,
+          withdraw: withdrawLimit
+        },
+        timestamp: new Date().toISOString()
+      }),
+      req.headers
+    )
 
     return NextResponse.json({
       message: 'User limits updated successfully'

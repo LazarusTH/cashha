@@ -88,6 +88,7 @@ export const POST = withAdmin(async (req: Request) => {
         }
       } catch (error) {
         console.error(`Failed to send receipt to ${user.email}:`, error)
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
 
         // Log email failure
         await supabase.from('email_logs').insert({
@@ -96,14 +97,14 @@ export const POST = withAdmin(async (req: Request) => {
           type: 'receipt',
           template_id: templateId,
           status: 'failed',
-          error: error.message
+          error: errorMessage
         })
 
         return {
           userId: user.id,
           email: user.email,
           status: 'failed',
-          error: error.message
+          error: errorMessage
         }
       }
     }))

@@ -6,7 +6,7 @@ import { logAdminAction } from '@/lib/utils/audit-logger'
 import { rateLimit } from '@/lib/utils/rate-limit'
 
 export const POST = withAdmin(async (req: Request, user: any) => {
-  const rateLimitResponse = await rateLimit(req.headers.get('x-forwarded-for') || 'unknown', 10)
+  const rateLimitResponse = await rateLimit(req.headers.get('x-forwarded-for') || 'unknown')
   if (rateLimitResponse) return rateLimitResponse
 
   const supabase = createRouteHandlerClient({ cookies })
@@ -44,11 +44,18 @@ export const POST = withAdmin(async (req: Request, user: any) => {
     if (txError) throw txError
 
     // Log action
-    await logAdminAction(user.id, 'BULK_SEND', {
-      recipientCount: recipients.length,
-      totalAmount: amount * recipients.length,
-      timestamp: new Date().toISOString()
-    })
+    await logAdminAction(
+      supabase,
+      user.id,
+      'system',  // use 'system' as target for bulk operations
+      'BULK_SEND',
+      JSON.stringify({
+        recipientCount: recipients.length,
+        totalAmount: amount * recipients.length,
+        timestamp: new Date().toISOString()
+      }),
+      req.headers
+    )
 
     return NextResponse.json({
       message: 'Bulk transfer completed successfully',

@@ -77,10 +77,17 @@ export const POST = withAdmin(async (req: Request, user: any) => {
     if (updateError) throw updateError
 
     // Log action
-    await logAdminAction(user.id, 'GENERATE_REVENUE_REPORT', {
-      reportId: report.id,
-      parameters: { startDate, endDate, groupBy }
-    })
+    await logAdminAction(
+      supabase,
+      user.id,
+      report.id,  // target is the report
+      'GENERATE_REVENUE_REPORT',
+      JSON.stringify({
+        reportId: report.id,
+        parameters: { startDate, endDate, groupBy }
+      }),
+      req.headers
+    )
 
     return NextResponse.json({
       report: {

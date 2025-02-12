@@ -35,11 +35,18 @@ export const POST = withAdmin(async (req: Request, { params }: { params: { id: s
     if (error) throw error
 
     // Log action
-    await logAdminAction(user.id, 'ASSIGN_USERS_TO_BANK', {
-      bankId: params.id,
-      userIds,
-      timestamp: new Date().toISOString()
-    })
+    await logAdminAction(
+      supabase,
+      user.id,
+      params.id,
+      'ASSIGN_USERS_TO_BANK',
+      JSON.stringify({
+        bankId: params.id,
+        userIds,
+        timestamp: new Date().toISOString()
+      }),
+      req.headers
+    )
 
     return NextResponse.json({ userBanks })
   } catch (error: any) {
@@ -74,11 +81,18 @@ export const DELETE = withAdmin(async (req: Request, { params }: { params: { id:
     if (error) throw error
 
     // Log action
-    await logAdminAction(user.id, 'REMOVE_USERS_FROM_BANK', {
-      bankId: params.id,
-      userIds,
-      timestamp: new Date().toISOString()
-    })
+    await logAdminAction(
+      supabase,
+      user.id,
+      params.id,
+      'REMOVE_USERS_FROM_BANK',
+      JSON.stringify({
+        bankId: params.id,
+        userIds,
+        timestamp: new Date().toISOString()
+      }),
+      req.headers
+    )
 
     return NextResponse.json({
       message: 'Users removed from bank successfully'

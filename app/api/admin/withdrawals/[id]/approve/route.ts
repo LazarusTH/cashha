@@ -4,15 +4,18 @@ import { NextResponse } from 'next/server'
 import { withAdmin } from '@/middleware/admin'
 import { rateLimit } from '@/lib/utils/rate-limit'
 import { sendEmail } from '@/lib/utils/email'
+import { logAdminAction } from '@/lib/utils/audit-logger'
 
-export const PUT = withAdmin(async (req: Request) => {
+export const PUT = withAdmin(async (req: Request, { params }: { params: { id: string } }) => {
   const rateLimitResponse = await rateLimit(req.headers.get('x-forwarded-for') || 'unknown')
   if (rateLimitResponse) return rateLimitResponse
 
   try {
     const supabase = createRouteHandlerClient({ cookies })
-    const { id } = req.url.split('/').slice(-2)[0]
     const { transactionId } = await req.json()
+
+    // Use params.id instead of parsing URL
+    const id = params.id
 
     // Get admin user
     const { data: { user } } = await supabase.auth.getUser()
@@ -84,11 +87,19 @@ export const PUT = withAdmin(async (req: Request) => {
     })
 
     // Log activity
-    await supabase.from('admin_activities').insert({
-      admin_id: user.id,
-      type: 'withdrawal_approved',
-      description: `Approved withdrawal request #${id} for ${withdrawal.amount} ETB`
-    })
+    await logAdminAction(
+      supabase,
+      user.id,
+      id,  // target is the withdrawal request
+      'APPROVE_WITHDRAWAL',
+      JSON.stringify({
+        withdrawal_id: id,
+        amount: withdrawal.amount,
+        transaction_id: transactionId,
+        timestamp: new Date().toISOString()
+      }),
+      req.headers
+    )
 
     return NextResponse.json({
       message: 'Withdrawal request approved successfully',

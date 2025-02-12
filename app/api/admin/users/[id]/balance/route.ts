@@ -74,13 +74,20 @@ export const PUT = withAdmin(async (req: Request, { params }: { params: { id: st
     if (notificationError) throw notificationError
 
     // Log action
-    await logAdminAction(user.id, 'UPDATE_USER_BALANCE', {
-      userId: params.id,
-      oldBalance: profile.balance,
-      newBalance: amount,
-      note,
-      timestamp: new Date().toISOString()
-    })
+    await logAdminAction(
+      supabase,
+      user.id,
+      params.id,  // target is the user whose balance is being updated
+      'UPDATE_USER_BALANCE',
+      JSON.stringify({
+        userId: params.id,
+        oldBalance: profile.balance,
+        newBalance: amount,
+        note,
+        timestamp: new Date().toISOString()
+      }),
+      req.headers
+    )
 
     return NextResponse.json({
       message: 'User balance updated successfully'

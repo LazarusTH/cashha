@@ -35,11 +35,18 @@ export const PUT = withAdmin(async (req: Request, { params }: { params: { id: st
     if (error) throw error
 
     // Log action
-    await logAdminAction(user.id, 'UPDATE_BANK', {
-      bankId: params.id,
-      updates,
-      timestamp: new Date().toISOString()
-    })
+    await logAdminAction(
+      supabase,
+      user.id,
+      params.id,
+      'UPDATE_BANK',
+      JSON.stringify({
+        bankId: params.id,
+        updates,
+        timestamp: new Date().toISOString()
+      }),
+      req.headers
+    )
 
     return NextResponse.json({ bank })
   } catch (error: any) {
@@ -86,10 +93,17 @@ export const DELETE = withAdmin(async (req: Request, { params }: { params: { id:
     if (error) throw error
 
     // Log action
-    await logAdminAction(user.id, 'DELETE_BANK', {
-      bankId: params.id,
-      timestamp: new Date().toISOString()
-    })
+    await logAdminAction(
+      supabase,
+      user.id,
+      params.id,
+      'DELETE_BANK',
+      JSON.stringify({
+        bankId: params.id,
+        timestamp: new Date().toISOString()
+      }),
+      req.headers
+    )
 
     return NextResponse.json({
       message: 'Bank deleted successfully'

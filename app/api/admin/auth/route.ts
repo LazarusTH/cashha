@@ -76,4 +76,4 @@ export const POST = async (req: Request) => {
       error: error.message || 'Authentication failed' 
     }), { status: 401 })
   }
-})
+}

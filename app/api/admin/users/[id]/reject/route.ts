@@ -61,11 +61,18 @@ export const PUT = withAdmin(async (req: Request, { params }: { params: { id: st
     if (notificationError) throw notificationError
 
     // Log action
-    await logAdminAction(user.id, 'REJECT_USER', {
-      userId: params.id,
-      reason,
-      timestamp: new Date().toISOString()
-    })
+    await logAdminAction(
+      supabase,
+      user.id,
+      params.id,  // target is the user being rejected
+      'REJECT_USER',
+      JSON.stringify({
+        userId: params.id,
+        reason,
+        timestamp: new Date().toISOString()
+      }),
+      req.headers
+    )
 
     return NextResponse.json({
       message: 'User rejected successfully'

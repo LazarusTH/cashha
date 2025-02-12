@@ -1,10 +1,22 @@
 import { NextResponse } from 'next/server'
-import { authenticatedRoute } from '@/lib/auth'
-import { supabase } from '@/lib/supabase/client'
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
+import { cookies } from 'next/headers'
 import UAParser from 'ua-parser-js'
 import { v4 as uuidv4 } from 'uuid'
+import { withAuth } from '@/middleware/auth'
 
-export const GET = authenticatedRoute(async (req, { user }) => {
+interface ErrorResponse {
+  error: string;
+  status?: number;
+}
+
+export const GET = withAuth(async (req: Request) => {
+  const supabase = createRouteHandlerClient({ cookies })
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   try {
     const { data: devices, error } = await supabase
       .from('device_history')
@@ -15,16 +27,19 @@ export const GET = authenticatedRoute(async (req, { user }) => {
     if (error) throw error
 
     return NextResponse.json({ devices })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error getting device history:', error)
     return NextResponse.json(
-      { error: 'Failed to get device history' },
+      { error: error.message || 'Failed to get device history' },
       { status: 500 }
     )
   }
 })
 
-export const POST = authenticatedRoute(async (req, { user }) => {
+export const POST = withAuth(async (req: Request) => {
+  const supabase = createRouteHandlerClient({ cookies })
+  const { data: { user } } = await supabase.auth.getUser()
+
   try {
     const userAgent = req.headers.get('user-agent')
     const ipAddress = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip')
@@ -75,16 +90,19 @@ export const POST = authenticatedRoute(async (req, { user }) => {
       })
 
     return NextResponse.json({ success: true, deviceId })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error adding device:', error)
     return NextResponse.json(
-      { error: 'Failed to add device' },
+      { error: error.message || 'Failed to add device' },
       { status: 500 }
     )
   }
 })
 
-export const DELETE = authenticatedRoute(async (req, { user }) => {
+export const DELETE = withAuth(async (req: Request) => {
+  const supabase = createRouteHandlerClient({ cookies })
+  const { data: { user } } = await supabase.auth.getUser()
+
   try {
     const { deviceId } = await req.json()
 
@@ -111,10 +129,10 @@ export const DELETE = authenticatedRoute(async (req, { user }) => {
       })
 
     return NextResponse.json({ success: true })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error removing device:', error)
     return NextResponse.json(
-      { error: 'Failed to remove device' },
+      { error: error.message || 'Failed to remove device' },
       { status: 500 }
     )
   }

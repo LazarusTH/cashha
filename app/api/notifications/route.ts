@@ -2,6 +2,8 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { rateLimit } from '@/lib/utils/rate-limit'
+import { withAdmin } from '@/lib/utils/admin-auth'
+import { sendEmail } from '@/lib/utils/email'
 
 export async function GET(req: Request) {
   const rateLimitResponse = await rateLimit(req.headers.get('x-forwarded-for') || 'unknown')
@@ -56,3 +58,23 @@ export async function GET(req: Request) {
     }), { status: 500 })
   }
 }
+
+export const POST = withAdmin(async (req: Request) => {
+  const { userId, type, message, data } = await req.json()
+  
+  // Create notification
+  await supabase
+    .from('notifications')
+    .insert({
+      user_id: userId,
+      type,
+      message,
+      data,
+      read: false
+    })
+    
+  // Send email if needed
+  if (type === 'account_blocked' || type === 'kyc_rejected') {
+    await sendEmail(userId, type, message)
+  }
+})

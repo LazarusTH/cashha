@@ -1,10 +1,10 @@
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { withAuth } from '@/middleware/auth'
+import { withAdmin } from '@/middleware/admin'
 import { rateLimit } from '@/lib/utils/rate-limit'
 
-export const GET = withAuth(async (req: Request) => {
+export const GET = withAdmin(async (req: Request) => {
   const rateLimitResponse = await rateLimit(req.headers.get('x-forwarded-for') || 'unknown')
   if (rateLimitResponse) return rateLimitResponse
 
@@ -48,15 +48,17 @@ export const GET = withAuth(async (req: Request) => {
     if (error) throw error
 
     return NextResponse.json({ users })
-  } catch (error: any) {
+  } catch (error) {
     console.error('Email receipt users fetch error:', error)
-    return new NextResponse(JSON.stringify({ 
-      error: error.message || 'Failed to fetch users' 
-    }), { status: 500 })
+    const errorMessage = error instanceof Error ? error.message : 'Failed to fetch users'
+    return new NextResponse(JSON.stringify({ error: errorMessage }), { 
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    })
   }
 })
 
-export const POST = withAuth(async (req: Request) => {
+export const POST = withAdmin(async (req: Request) => {
   const rateLimitResponse = await rateLimit(req.headers.get('x-forwarded-for') || 'unknown')
   if (rateLimitResponse) return rateLimitResponse
 
@@ -160,10 +162,12 @@ export const POST = withAuth(async (req: Request) => {
       batch_id: batch.id,
       recipient_count: validRecipients.length
     })
-  } catch (error: any) {
+  } catch (error) {
     console.error('Email receipt send error:', error)
-    return new NextResponse(JSON.stringify({ 
-      error: error.message || 'Failed to send email receipts' 
-    }), { status: 500 })
+    const errorMessage = error instanceof Error ? error.message : 'Failed to send receipts'
+    return new NextResponse(JSON.stringify({ error: errorMessage }), { 
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    })
   }
 })
