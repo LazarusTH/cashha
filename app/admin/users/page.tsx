@@ -13,7 +13,7 @@ import Image from "next/image"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { toast } from "@/components/ui/toast"
-import { supabase } from "@/lib/supabase"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 
 interface User {
   id: string;
@@ -35,6 +35,17 @@ interface User {
   };
 }
 
+interface LimitState {
+  type: 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly' | 'custom';
+  value: string;
+  customDays: string;
+}
+
+interface Limits {
+  send: LimitState;
+  withdraw: LimitState;
+}
+
 export default function UsersManagement() {
   const [users, setUsers] = useState<User[]>([])
   const [pendingUsers, setPendingUsers] = useState<User[]>([])
@@ -44,6 +55,65 @@ export default function UsersManagement() {
   const [isUserDetailDialogOpen, setIsUserDetailDialogOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [rejectionReason, setRejectionReason] = useState<string>('')
+  const supabase = createClientComponentClient()
+
+  const handleLimitChange = (operation: 'send' | 'withdraw', value: string) => {
+    setLimits(prev => ({
+      ...prev,
+      [operation]: {
+        ...prev[operation],
+        type: value as LimitState['type']
+      }
+    }))
+  }
+
+  const handleLimitValueChange = (operation: 'send' | 'withdraw', value: string) => {
+    setLimits(prev => ({
+      ...prev,
+      [operation]: {
+        ...prev[operation],
+        value
+      }
+    }))
+  }
+
+  const handleCustomDaysChange = (operation: 'send' | 'withdraw', value: string) => {
+    setLimits(prev => ({
+      ...prev,
+      [operation]: {
+        ...prev[operation],
+        customDays: value
+      }
+    }))
+  }
+
+  const handleSaveLimits = async () => {
+    if (!selectedUser) return
+
+    try {
+      const limitsToUpdate = {
+        sendLimit: limits.send.value ? parseInt(limits.send.value) : null,
+        withdrawLimit: limits.withdraw.value ? parseInt(limits.withdraw.value) : null,
+        customDays: {
+          send: limits.send.type === 'custom' ? parseInt(limits.send.customDays) : null,
+          withdraw: limits.withdraw.type === 'custom' ? parseInt(limits.withdraw.customDays) : null
+        }
+      }
+
+      await handleUpdateUserLimits(selectedUser.id, limitsToUpdate)
+      toast({
+        title: 'Success',
+        description: 'User limits updated successfully'
+      })
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to update limits',
+        variant: 'destructive'
+      })
+    }
+  }
 
   useEffect(() => {
     const userChannel = supabase
@@ -68,6 +138,7 @@ export default function UsersManagement() {
 
   const fetchUsers = async () => {
     try {
+      setLoading(true)
       const response = await fetch('/api/admin/users')
       if (!response.ok) {
         throw new Error('Failed to fetch users')
@@ -167,29 +238,32 @@ export default function UsersManagement() {
     }
   }
 
-  const handleUpdateUserLimits = async (userId: string, type: 'send' | 'withdraw', limit: number | null) => {
-    try {
-      const response = await fetch('/api/admin/users/update-limits', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          id: userId,
-          [type === 'send' ? 'send_limit' : 'withdraw_limit']: limit,
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to update user limits')
+  const handleUpdateUserLimits = async (
+    userId: string,
+    limits: {
+      sendLimit?: number | null,
+      withdrawLimit?: number | null,
+      customDays?: {
+        send?: number | null,
+        withdraw?: number | null
       }
-
-      await fetchUsers()
-    } catch (err) {
-      console.error('Error updating user limits:', err)
-      setError('Failed to update user limits. Please try again.')
     }
-  }
+  ) => {
+    try {
+      validateLimits(limits);
+      await handleUserAction(userId, 'update-limits', {
+        send_limit: limits.sendLimit,
+        withdraw_limit: limits.withdrawLimit,
+        custom_days: limits.customDays
+      });
+    } catch (error) {
+      toast({
+        title: 'Validation Error',
+        description: error instanceof Error ? error.message : 'Invalid input',
+        variant: 'destructive',
+      });
+    }
+  };
 
   const handleDeleteUser = async (userId: string) => {
     try {
@@ -265,15 +339,6 @@ export default function UsersManagement() {
     await handleUserAction(userId, 'reset-password')
   }
 
-  const handleUpdateUserLimits = async (userId: string, limits: { 
-    send_limit?: number, 
-    withdraw_limit?: number,
-    daily_limit?: number,
-    monthly_limit?: number 
-  }) => {
-    await handleUserAction(userId, 'update-limits', limits)
-  }
-
   const handleVerifyKYC = async (userId: string) => {
     await handleUserAction(userId, 'verify-kyc')
   }
@@ -309,6 +374,212 @@ export default function UsersManagement() {
         title: 'Error',
         description: error instanceof Error ? error.message : 'Failed to export users',
         variant: 'destructive',
+      })
+    }
+  }
+
+  const onApprove = async (userId: string) => {
+    try {
+      const response = await fetch(`/api/admin/users/${userId}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.message || 'Failed to approve user')
+      }
+
+      await fetchUsers()
+      toast({
+        title: 'Success',
+        description: 'User approved successfully'
+      })
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to approve user',
+        variant: 'destructive'
+      })
+    }
+  }
+
+  const onReject = async (userId: string, reason: string) => {
+    if (!reason.trim()) {
+      toast({
+        title: 'Error',
+        description: 'Please provide a rejection reason',
+        variant: 'destructive'
+      })
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/admin/users/${userId}/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason })
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.message || 'Failed to reject user')
+      }
+
+      await fetchUsers()
+      setRejectionReason('')
+      toast({
+        title: 'Success',
+        description: 'User rejected successfully'
+      })
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to reject user',
+        variant: 'destructive'
+      })
+    }
+  }
+
+  const onDelete = async (userId: string) => {
+    if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/admin/users/${userId}`, {
+        method: 'DELETE'
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.message || 'Failed to delete user')
+      }
+
+      await fetchUsers()
+      toast({
+        title: 'Success',
+        description: 'User deleted successfully'
+      })
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to delete user',
+        variant: 'destructive'
+      })
+    }
+  }
+
+  const onBlock = async (userId: string, reason: string) => {
+    if (!reason.trim()) {
+      toast({
+        title: 'Error',
+        description: 'Please provide a reason for blocking the user',
+        variant: 'destructive'
+      })
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/admin/users/${userId}/block`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason })
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.message || 'Failed to block user')
+      }
+
+      await fetchUsers()
+      toast({
+        title: 'Success',
+        description: 'User blocked successfully'
+      })
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to block user',
+        variant: 'destructive'
+      })
+    }
+  }
+
+  const onUnblock = async (userId: string) => {
+    try {
+      const response = await fetch(`/api/admin/users/${userId}/unblock`, {
+        method: 'POST'
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.message || 'Failed to unblock user')
+      }
+
+      await fetchUsers()
+      toast({
+        title: 'Success',
+        description: 'User unblocked successfully'
+      })
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to unblock user',
+        variant: 'destructive'
+      })
+    }
+  }
+
+  const onResetPassword = async (userId: string) => {
+    if (!confirm('Are you sure you want to reset this user\'s password?')) {
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/admin/users/${userId}/reset-password`, {
+        method: 'POST'
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.message || 'Failed to reset password')
+      }
+
+      toast({
+        title: 'Success',
+        description: 'Password reset email sent successfully'
+      })
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to reset password',
+        variant: 'destructive'
+      })
+    }
+  }
+
+  const onVerifyKYC = async (userId: string) => {
+    try {
+      const response = await fetch(`/api/admin/users/${userId}/verify-kyc`, {
+        method: 'POST'
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.message || 'Failed to verify KYC')
+      }
+
+      await fetchUsers()
+      toast({
+        title: 'Success',
+        description: 'KYC verified successfully'
+      })
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to verify KYC',
+        variant: 'destructive'
       })
     }
   }
@@ -621,7 +892,7 @@ interface UserDetailFormProps {
   user: User;
   onApprove: (userId: string) => void;
   onReject: (userId: string, reason: string) => void;
-  onUpdateLimits: (userId: string, type: 'send' | 'withdraw', limit: number | null) => void;
+  onUpdateLimits: (userId: string, limits: any) => void;
   onDelete: (userId: string) => void;
   onBlock: (userId: string, reason: string) => void;
   onUnblock: (userId: string) => void;
@@ -668,13 +939,12 @@ function UserDetailForm({ user, onApprove, onReject, onUpdateLimits, onDelete, o
   const handleSaveLimits = () => {
     onUpdateLimits(
       user.id,
-      'send',
-      limits.send.type === 'none' ? null : parseFloat(limits.send.value)
-    )
-    onUpdateLimits(
-      user.id,
-      'withdraw',
-      limits.withdraw.type === 'none' ? null : parseFloat(limits.withdraw.value)
+      {
+        dailyLimit: limits.send.type === 'none' ? null : parseFloat(limits.send.value),
+        monthlyLimit: limits.withdraw.type === 'none' ? null : parseFloat(limits.withdraw.value),
+        sendLimit: limits.send.type === 'none' ? null : parseFloat(limits.send.value),
+        withdrawLimit: limits.withdraw.type === 'none' ? null : parseFloat(limits.withdraw.value),
+      }
     )
   }
 

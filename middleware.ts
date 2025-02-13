@@ -1,57 +1,156 @@
-import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs'
+import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { Ratelimit } from '@upstash/ratelimit'
 import { Redis } from '@upstash/redis'
 
-// Create a new ratelimiter that allows 10 requests per 10 seconds
-const ratelimit = new Ratelimit({
-  redis: Redis.fromEnv(),
-  limiter: Ratelimit.slidingWindow(10, '10 s'),
-  analytics: true,
-})
+// Ensure Redis environment variables are set
+if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
+  throw new Error('Missing Redis environment variables')
+}
+
+// Ensure Supabase environment variables are set
+if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+  throw new Error('Missing Supabase environment variables')
+}
+
+// Configure different rate limits for different endpoints
+const rateLimits = {
+  auth: new Ratelimit({
+    redis: Redis.fromEnv(),
+    limiter: Ratelimit.slidingWindow(10, '10 s'),
+    analytics: true,
+    prefix: 'ratelimit_auth',
+  }),
+  api: new Ratelimit({
+    redis: Redis.fromEnv(),
+    limiter: Ratelimit.slidingWindow(100, '60 s'),
+    analytics: true,
+    prefix: 'ratelimit_api',
+  }),
+  general: new Ratelimit({
+    redis: Redis.fromEnv(),
+    limiter: Ratelimit.slidingWindow(50, '60 s'),
+    analytics: true,
+    prefix: 'ratelimit_general',
+  })
+}
 
 export async function middleware(request: NextRequest) {
   try {
-    // Rate limiting for auth endpoints
+    // Get client IP with fallbacks
+    const ip = request.headers.get('x-forwarded-for') ||
+               request.headers.get('x-real-ip') ||
+               request.ip ||
+               '127.0.0.1'
+
+    // Apply different rate limits based on the route
     if (request.nextUrl.pathname.startsWith('/api/auth')) {
-      const ip = request.ip ?? '127.0.0.1'
-      const { success, pending, limit, reset, remaining } = await ratelimit.limit(
-        `ratelimit_${ip}`
+      const { success, limit, reset, remaining } = await rateLimits.auth.limit(
+        `auth_${ip}`
       )
 
       if (!success) {
-        return new NextResponse('Too Many Requests', {
+        return new NextResponse('Too Many Auth Requests', {
           status: 429,
           headers: {
             'X-RateLimit-Limit': limit.toString(),
             'X-RateLimit-Remaining': remaining.toString(),
             'X-RateLimit-Reset': reset.toString(),
+            'Retry-After': Math.ceil((reset - Date.now()) / 1000).toString(),
           },
         })
       }
+    } else if (request.nextUrl.pathname.startsWith('/api/')) {
+      const { success, limit, reset, remaining } = await rateLimits.api.limit(
+        `api_${ip}`
+      )
+
+      if (!success) {
+        return new NextResponse('Too Many API Requests', {
+          status: 429,
+          headers: {
+            'X-RateLimit-Limit': limit.toString(),
+            'X-RateLimit-Remaining': remaining.toString(),
+            'X-RateLimit-Reset': reset.toString(),
+            'Retry-After': Math.ceil((reset - Date.now()) / 1000).toString(),
+          },
+        })
+      }
+    } else {
+      const { success } = await rateLimits.general.limit(
+        `general_${ip}`
+      )
+
+      if (!success) {
+        return new NextResponse('Too Many Requests', { status: 429 })
+      }
     }
 
-    const res = NextResponse.next()
-    const supabase = createMiddlewareClient({ req: request, res })
+    // Create a response with the appropriate headers
+    const response = NextResponse.next()
+
+    // Create a Supabase client
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          get(name: string) {
+            return request.cookies.get(name)?.value
+          },
+          set(name: string, value: string, options: any) {
+            response.cookies.set({
+              name,
+              value,
+              ...options,
+            })
+          },
+          remove(name: string, options: any) {
+            response.cookies.set({
+              name,
+              value: '',
+              ...options,
+            })
+          },
+        },
+      }
+    )
 
     // Refresh session if expired
-    const {
-      data: { session },
-    } = await supabase.auth.getSession()
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+    if (sessionError) {
+      console.error('Session error:', sessionError)
+      return response
+    }
 
     // Protected routes
-    const protectedRoutes = ['/dashboard', '/settings', '/transactions']
+    const protectedRoutes = ['/dashboard', '/settings', '/transactions', '/admin']
     const isProtectedRoute = protectedRoutes.some(route => 
       request.nextUrl.pathname.startsWith(route)
     )
 
     if (isProtectedRoute && !session) {
-      return NextResponse.redirect(new URL('/signin', request.url))
+      const redirectUrl = new URL('/signin', request.url)
+      redirectUrl.searchParams.set('redirect', request.nextUrl.pathname)
+      return NextResponse.redirect(redirectUrl)
+    }
+
+    // Admin routes protection
+    if (request.nextUrl.pathname.startsWith('/admin')) {
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', session?.user?.id)
+        .single()
+
+      if (profileError || !profile || profile.role !== 'admin') {
+        return new NextResponse('Unauthorized', { status: 403 })
+      }
     }
 
     // Auth routes (when already logged in)
-    const authRoutes = ['/signin', '/signup']
+    const authRoutes = ['/signin', '/signup', '/forgot-password']
     const isAuthRoute = authRoutes.some(route => 
       request.nextUrl.pathname.startsWith(route)
     )
@@ -60,72 +159,10 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/dashboard', request.url))
     }
 
-    // List of sensitive routes that need rate limiting
-    const sensitiveRoutes = [
-      "/api/auth/login",
-      "/api/auth/signup",
-      "/api/auth/recover",
-      "/api/profile",
-    ];
-
-    // Check if this is a sensitive route
-    if (sensitiveRoutes.some((route) => request.nextUrl.pathname.startsWith(route))) {
-      // Get IP for rate limiting
-      const ip = request.ip ?? "127.0.0.1";
-      const { success, limit, reset, remaining } = await ratelimit.limit(
-        `${request.nextUrl.pathname}_${ip}`
-      );
-
-      // Set rate limit headers
-      res.headers.set("X-RateLimit-Limit", limit.toString());
-      res.headers.set("X-RateLimit-Remaining", remaining.toString());
-      res.headers.set("X-RateLimit-Reset", reset.toString());
-
-      if (!success) {
-        return NextResponse.json(
-          { error: "Too many requests" },
-          { status: 429 }
-        );
-      }
-    }
-
-    // Get the pathname
-    const path = request.nextUrl.pathname
-
-    // Paths that are always accessible
-    const publicPaths = ['/', '/signin', '/signup']
-    if (publicPaths.includes(path)) {
-      return res
-    }
-
-    // Check if user is authenticated
-    if (!session) {
-      return NextResponse.redirect(new URL('/signin', request.url))
-    }
-
-    // Get user role
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', session.user.id)
-      .single()
-
-    const role = profile?.role || 'user'
-
-    // Admin route protection
-    if (path.startsWith('/admin') && role !== 'admin') {
-      return NextResponse.redirect(new URL('/user/dashboard', request.url))
-    }
-
-    // User route protection
-    if (path.startsWith('/user') && role !== 'user') {
-      return NextResponse.redirect(new URL('/admin/dashboard', request.url))
-    }
-
-    return res
-  } catch (e) {
-    console.error('Middleware error:', e)
-    return NextResponse.next()
+    return response
+  } catch (error) {
+    console.error('Middleware error:', error)
+    return new NextResponse('Internal Server Error', { status: 500 })
   }
 }
 
