@@ -12,7 +12,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import Image from "next/image"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { toast } from "@/components/ui/toast"
+import { useToast } from "@/components/ui/use-toast"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 
 interface User {
@@ -56,6 +56,7 @@ export default function UsersManagement() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [rejectionReason, setRejectionReason] = useState<string>('')
+  const { toast } = useToast()
   const supabase = createClientComponentClient()
 
   const handleLimitChange = (operation: 'send' | 'withdraw', value: string) => {

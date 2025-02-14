@@ -205,3 +205,41 @@ export function subscribeToUserTransactions(
     )
     .subscribe()
 }
+
+export async function createTransfer(data: {
+  user_id: string;
+  recipient_id: string;
+  amount: number;
+  description?: string;
+  metadata?: TransactionMetadata;
+}) {
+  try {
+    const { data: transaction, error } = await supabase
+      .from('transactions')
+      .insert([{
+        ...data,
+        type: 'send',
+        status: 'pending'
+      }])
+      .select(`
+        *,
+        user:profiles!user_id (
+          id,
+          email,
+          full_name
+        ),
+        recipient:profiles!recipient_id (
+          id,
+          email,
+          full_name
+        )
+      `)
+      .single()
+
+    if (error) throw error
+    return transaction
+  } catch (error) {
+    console.error('Error creating transfer:', error)
+    throw error
+  }
+}

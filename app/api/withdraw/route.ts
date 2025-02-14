@@ -1,7 +1,7 @@
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { createWithdrawal, getUserTransactions, getUserBalance } from '@/lib/supabase/transactions'
+import { createTransaction, getUserTransactions, getUserBalance } from '@/lib/supabase/transactions'
 
 export async function POST(request: Request) {
   const cookieStore = cookies()
@@ -23,10 +23,13 @@ export async function POST(request: Request) {
     }
 
     // Create withdrawal
-    const withdrawal = await createWithdrawal({
-      userId: user.id,
+    const withdrawal = await createTransaction({
+      user_id: user.id,
+      type: 'withdraw',
       amount,
-      bankId
+      metadata: {
+        account_number: bankId
+      }
     })
 
     return NextResponse.json(withdrawal)
@@ -51,7 +54,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
     const limit = parseInt(searchParams.get('limit') || '10')
 
-    const transactions = await getUserTransactions(user.id, limit, 'withdraw')
+    const transactions = await getUserTransactions(user.id, limit)
     return NextResponse.json(transactions)
   } catch (error) {
     console.error('Error fetching withdrawal history:', error)

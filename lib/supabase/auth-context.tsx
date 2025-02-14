@@ -1,13 +1,14 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState } from 'react'
-import { User } from '@supabase/supabase-js'
-import { supabase, getCurrentUser } from './client'
+import { createBrowserClient } from '@supabase/ssr'
 import { useRouter } from 'next/navigation'
+import { Database } from '@/types/supabase'
 import { toast } from '@/components/ui/use-toast'
 
-type AuthContextType = {
-  user: User | null
+interface AuthContextType {
+  user: any
+  profile: any
   loading: boolean
   error: Error | null
   signIn: (email: string, password: string) => Promise<void>
@@ -44,6 +45,7 @@ interface UserProfile {
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
+  profile: null,
   loading: true,
   error: null,
   signIn: async () => {},
@@ -62,7 +64,8 @@ const AuthContext = createContext<AuthContextType>({
 })
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
+  const [user, setUser] = useState<any>(null)
+  const [profile, setProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
   const [isEmailVerified, setIsEmailVerified] = useState(false)
@@ -70,71 +73,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [lastActive, setLastActive] = useState<Date | null>(null)
   const router = useRouter()
 
+  const supabase = createBrowserClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
+
   useEffect(() => {
-    // Check active session and user metadata
-    const checkUser = async () => {
-      try {
-        const { user, error } = await getCurrentUser()
-        if (error) throw error
-        
-        if (user) {
-          setUser(user)
-          setIsEmailVerified(user.email_confirmed_at != null)
-          
-          // Fetch user role and metadata
-          const { data: profile, error: profileError } = await supabase
-            .from('profiles')
-            .select('role, last_active')
-            .eq('id', user.id)
-            .single()
-            
-          if (profileError) throw profileError
-          
-          setRole(profile.role)
-          setLastActive(profile.last_active ? new Date(profile.last_active) : null)
-          
-          // Update last active timestamp
-          await supabase
-            .from('profiles')
-            .update({ last_active: new Date().toISOString() })
-            .eq('id', user.id)
-        }
-      } catch (e) {
-        console.error('Error checking user:', e)
-        setError(e as Error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    checkUser()
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      const user = session?.user
-      setUser(user ?? null)
-      
-      if (user) {
-        setIsEmailVerified(user.email_confirmed_at != null)
-        
-        // Fetch user role and metadata on auth state change
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        setUser(session.user)
         const { data: profile } = await supabase
           .from('profiles')
-          .select('role, last_active')
-          .eq('id', user.id)
+          .select('*')
+          .eq('id', session.user.id)
           .single()
-          
-        if (profile) {
-          setRole(profile.role)
-          setLastActive(profile.last_active ? new Date(profile.last_active) : null)
-        }
+        setProfile(profile)
+        setIsEmailVerified(profile.email_confirmed_at != null)
+        setRole(profile.role)
+        setLastActive(profile.last_active ? new Date(profile.last_active) : null)
       } else {
+        setUser(null)
+        setProfile(null)
         setIsEmailVerified(false)
         setRole(null)
         setLastActive(null)
       }
-      
       setLoading(false)
+      router.refresh()
     })
 
     return () => {
@@ -353,8 +320,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshSession = async () => {
     try {
-      const { error } = await supabase.auth.refreshSession()
-      if (error) throw error
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.user) {
+        setUser(session.user)
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single()
+        setProfile(profile)
+        setIsEmailVerified(profile.email_confirmed_at != null)
+        setRole(profile.role)
+        setLastActive(profile.last_active ? new Date(profile.last_active) : null)
+      }
     } catch (error) {
       console.error('Error refreshing session:', error)
       throw error
@@ -419,6 +397,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     <AuthContext.Provider
       value={{
         user,
+        profile,
         loading,
         error,
         signIn,
@@ -441,9 +420,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   )
 }
 
-export function useAuth() {
+export const useAuth = () => {
   const context = useContext(AuthContext)
-  if (!context) {
+  if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider')
   }
   return context

@@ -4,36 +4,40 @@ import type { NextRequest } from 'next/server'
 import { Ratelimit } from '@upstash/ratelimit'
 import { Redis } from '@upstash/redis'
 
-// Ensure Redis environment variables are set
-if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
-  throw new Error('Missing Redis environment variables')
-}
-
 // Ensure Supabase environment variables are set
 if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
   throw new Error('Missing Supabase environment variables')
 }
 
-// Configure different rate limits for different endpoints
-const rateLimits = {
-  auth: new Ratelimit({
-    redis: Redis.fromEnv(),
-    limiter: Ratelimit.slidingWindow(10, '10 s'),
-    analytics: true,
-    prefix: 'ratelimit_auth',
-  }),
-  api: new Ratelimit({
-    redis: Redis.fromEnv(),
-    limiter: Ratelimit.slidingWindow(100, '60 s'),
-    analytics: true,
-    prefix: 'ratelimit_api',
-  }),
-  general: new Ratelimit({
-    redis: Redis.fromEnv(),
-    limiter: Ratelimit.slidingWindow(50, '60 s'),
-    analytics: true,
-    prefix: 'ratelimit_general',
-  })
+// Initialize rate limiters only if Redis is configured
+let rateLimits: {
+  auth?: Ratelimit;
+  api?: Ratelimit;
+  general?: Ratelimit;
+} = {}
+
+if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+  const redis = Redis.fromEnv()
+  rateLimits = {
+    auth: new Ratelimit({
+      redis,
+  limiter: Ratelimit.slidingWindow(10, '10 s'),
+  analytics: true,
+      prefix: 'ratelimit_auth',
+    }),
+    api: new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(100, '60 s'),
+      analytics: true,
+      prefix: 'ratelimit_api',
+    }),
+    general: new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(50, '60 s'),
+      analytics: true,
+      prefix: 'ratelimit_general',
+    })
+  }
 }
 
 export async function middleware(request: NextRequest) {
@@ -44,46 +48,49 @@ export async function middleware(request: NextRequest) {
                request.ip ||
                '127.0.0.1'
 
-    // Apply different rate limits based on the route
-    if (request.nextUrl.pathname.startsWith('/api/auth')) {
-      const { success, limit, reset, remaining } = await rateLimits.auth.limit(
-        `auth_${ip}`
+    // Only apply rate limiting if Redis is configured
+    if (Object.keys(rateLimits).length > 0) {
+      // Apply different rate limits based on the route
+      if (request.nextUrl.pathname.startsWith('/api/auth') && rateLimits.auth) {
+        const { success, limit, reset, remaining } = await rateLimits.auth.limit(
+          `auth_${ip}`
+        )
+
+        if (!success) {
+          return new NextResponse('Too Many Auth Requests', {
+            status: 429,
+            headers: {
+              'X-RateLimit-Limit': limit.toString(),
+              'X-RateLimit-Remaining': remaining.toString(),
+              'X-RateLimit-Reset': reset.toString(),
+              'Retry-After': Math.ceil((reset - Date.now()) / 1000).toString(),
+            },
+          })
+        }
+      } else if (request.nextUrl.pathname.startsWith('/api/') && rateLimits.api) {
+        const { success, limit, reset, remaining } = await rateLimits.api.limit(
+          `api_${ip}`
       )
 
       if (!success) {
-        return new NextResponse('Too Many Auth Requests', {
+          return new NextResponse('Too Many API Requests', {
           status: 429,
           headers: {
             'X-RateLimit-Limit': limit.toString(),
             'X-RateLimit-Remaining': remaining.toString(),
             'X-RateLimit-Reset': reset.toString(),
-            'Retry-After': Math.ceil((reset - Date.now()) / 1000).toString(),
-          },
-        })
-      }
-    } else if (request.nextUrl.pathname.startsWith('/api/')) {
-      const { success, limit, reset, remaining } = await rateLimits.api.limit(
-        `api_${ip}`
-      )
+              'Retry-After': Math.ceil((reset - Date.now()) / 1000).toString(),
+            },
+          })
+        }
+      } else if (rateLimits.general) {
+        const { success } = await rateLimits.general.limit(
+          `general_${ip}`
+        )
 
-      if (!success) {
-        return new NextResponse('Too Many API Requests', {
-          status: 429,
-          headers: {
-            'X-RateLimit-Limit': limit.toString(),
-            'X-RateLimit-Remaining': remaining.toString(),
-            'X-RateLimit-Reset': reset.toString(),
-            'Retry-After': Math.ceil((reset - Date.now()) / 1000).toString(),
-          },
-        })
-      }
-    } else {
-      const { success } = await rateLimits.general.limit(
-        `general_${ip}`
-      )
-
-      if (!success) {
-        return new NextResponse('Too Many Requests', { status: 429 })
+        if (!success) {
+          return new NextResponse('Too Many Requests', { status: 429 })
+        }
       }
     }
 

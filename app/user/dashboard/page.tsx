@@ -3,16 +3,16 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Line, LineChart } from "recharts"
 import { ArrowUpIcon, ArrowDownIcon, ArrowRightIcon, WalletIcon } from "lucide-react"
-import { useDashboardData } from "@/lib/hooks/use-dashboard-data"
-import { useTransactionSubscription } from "@/lib/hooks/use-transaction-subscription"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { supabase } from "@/lib/supabase"
+import { createBrowserClient } from "@supabase/ssr"
 import { useEffect, useState } from "react"
-import { useRouter } from "next/router"
-import { Progress, ScrollArea, Badge } from "@/components/ui/scroll-area"
+import { useRouter } from "next/navigation"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Progress } from "@/components/ui/progress"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/components/ui/use-toast"
 
 interface MetricCardProps { 
   title: string
@@ -41,7 +41,9 @@ function MetricCard({ title, value, icon, loading }: MetricCardProps) {
 
 export default function UserDashboard() {
   const { toast } = useToast();
-  const { data, loading, error, refetch } = useDashboardData()
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<Error | null>(null)
+  const [data, setData] = useState<any>(null)
   const [userStatus, setUserStatus] = useState<'active' | 'blocked' | 'pending'>('active')
   const [verificationStatus, setVerificationStatus] = useState<'verified' | 'pending' | 'rejected'>('pending')
   const [notifications, setNotifications] = useState<any[]>([])
@@ -52,13 +54,44 @@ export default function UserDashboard() {
     withdrawLimit: 0,
   })
   const [recentActivity, setRecentActivity] = useState<any[]>([])
-  const user = supabase.auth.user()
   const router = useRouter()
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
+
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true)
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        router.push('/signin')
+        return
+      }
+
+      // Fetch dashboard data
+      const response = await fetch('/api/user/dashboard')
+      if (!response.ok) {
+        throw new Error('Failed to fetch dashboard data')
+      }
+      const dashboardData = await response.json()
+      setData(dashboardData)
+    } catch (err) {
+      console.error('Error fetching dashboard data:', err)
+      setError(err instanceof Error ? err : new Error('Failed to fetch dashboard data'))
+    } finally {
+      setLoading(false)
+    }
+  }
 
   // Check user status and verification
   useEffect(() => {
     const checkUserStatus = async () => {
-      if (!user) return
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        router.push('/signin')
+        return
+      }
 
       try {
         const { data: profile, error } = await supabase
@@ -96,70 +129,75 @@ export default function UserDashboard() {
     }
 
     checkUserStatus()
-  }, [user])
+  }, [])
 
-  // Subscribe to transaction updates
-  useTransactionSubscription(() => {
-    refetch()
-  })
-
-  // Subscribe to real-time balance updates
+  // Subscribe to real-time updates
   useEffect(() => {
-    if (!user) return
+    const setupSubscriptions = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
 
-    const balanceChannel = supabase
-      .channel('balance_updates')
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'balances',
-        filter: `user_id=eq.${user.id}`,
-      }, (payload) => {
-        refetch()
-      })
-      .subscribe()
+      const balanceChannel = supabase
+        .channel('balance_updates')
+        .on('postgres_changes', {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'balances',
+          filter: `user_id=eq.${user.id}`,
+        }, () => {
+          fetchDashboardData()
+        })
+        .subscribe()
 
-    const notificationChannel = supabase
-      .channel('user_notifications')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'notifications',
-        filter: `user_id=eq.${user.id}`,
-      }, (payload) => {
-        fetchNotifications()
-      })
-      .subscribe()
+      const notificationChannel = supabase
+        .channel('user_notifications')
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${user.id}`,
+        }, () => {
+          fetchNotifications()
+        })
+        .subscribe()
 
-    const activityChannel = supabase
-      .channel('user_activity')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'activity_log',
-        filter: `user_id=eq.${user.id}`,
-      }, (payload) => {
-        fetchRecentActivity()
-      })
-      .subscribe()
+      const activityChannel = supabase
+        .channel('user_activity')
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'activity_log',
+          filter: `user_id=eq.${user.id}`,
+        }, () => {
+          fetchRecentActivity()
+        })
+        .subscribe()
 
-    return () => {
-      balanceChannel.unsubscribe()
-      notificationChannel.unsubscribe()
-      activityChannel.unsubscribe()
+      return () => {
+        balanceChannel.unsubscribe()
+        notificationChannel.unsubscribe()
+        activityChannel.unsubscribe()
+      }
     }
-  }, [user])
+
+    setupSubscriptions()
+  }, [])
+
+  // Initial data fetch
+  useEffect(() => {
+    fetchDashboardData()
+  }, [])
 
   // Fetch user limits
   useEffect(() => {
     const fetchLimits = async () => {
-      if (!user) return
+      if (!data?.user) return
 
       try {
         const { data: userLimits, error } = await supabase
           .from('user_limits')
           .select('*')
-          .eq('user_id', user.id)
+          .eq('user_id', data.user.id)
           .single()
 
         if (error) throw error
@@ -171,13 +209,13 @@ export default function UserDashboard() {
         const { data: todayTransactions } = await supabase
           .from('transactions')
           .select('amount')
-          .eq('user_id', user.id)
+          .eq('user_id', data.user.id)
           .gte('created_at', today.toISOString().split('T')[0])
 
         const { data: monthTransactions } = await supabase
           .from('transactions')
           .select('amount')
-          .eq('user_id', user.id)
+          .eq('user_id', data.user.id)
           .gte('created_at', new Date(today.getFullYear(), thisMonth, 1).toISOString())
 
         const dailyTotal = todayTransactions?.reduce((sum, tx) => sum + tx.amount, 0) || 0
@@ -195,16 +233,16 @@ export default function UserDashboard() {
     }
 
     fetchLimits()
-  }, [user])
+  }, [data?.user])
 
   const fetchNotifications = async () => {
-    if (!user) return
+    if (!data?.user) return
 
     try {
       const { data, error } = await supabase
         .from('notifications')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', data.user.id)
         .order('created_at', { ascending: false })
         .limit(5)
 
@@ -216,13 +254,13 @@ export default function UserDashboard() {
   }
 
   const fetchRecentActivity = async () => {
-    if (!user) return
+    if (!data?.user) return
 
     try {
       const { data, error } = await supabase
         .from('activity_log')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', data.user.id)
         .order('created_at', { ascending: false })
         .limit(10)
 

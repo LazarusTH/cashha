@@ -1,14 +1,26 @@
-"use client"
-
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { motion } from "framer-motion"
-import { createServerComponentClient } from "@supabase/auth-helpers-nextjs"
+import { HeroSection } from "@/components/hero-section"
+import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { Database } from "@/types/supabase"
 
 async function getHeroContent() {
-  const supabase = createServerComponentClient<Database>({ cookies })
+  const supabase = createServerClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookies().get(name)?.value
+        },
+        set(name: string, value: string, options: any) {
+          cookies().set({ name, value, ...options })
+        },
+        remove(name: string, options: any) {
+          cookies().set({ name, value: '', ...options })
+        },
+      },
+    }
+  )
   
   try {
     const { data, error } = await supabase
@@ -39,31 +51,5 @@ async function getHeroContent() {
 
 export default async function Home() {
   const heroContent = await getHeroContent()
-  
-  return (
-    <div className="min-h-screen bg-gradient-to-r from-blue-400 to-purple-500 flex flex-col items-center justify-center text-white">
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="text-center"
-      >
-        <h1 className="text-6xl font-bold mb-4">{heroContent.title}</h1>
-        <p className="text-xl mb-8">{heroContent.description}</p>
-      </motion.div>
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.2 }}
-        className="space-x-4"
-      >
-        <Button asChild>
-          <Link href="/signin">Sign In</Link>
-        </Button>
-        <Button asChild variant="secondary">
-          <Link href="/signup">Create Account</Link>
-        </Button>
-      </motion.div>
-    </div>
-  )
+  return <HeroSection content={heroContent} />
 }

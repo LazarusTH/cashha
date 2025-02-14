@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { createBrowserClient } from "@supabase/ssr";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,66 +18,29 @@ export default function AccountRecovery({
   open,
   onOpenChange,
 }: AccountRecoveryProps) {
-  const [step, setStep] = useState<"email" | "questions">("email");
   const [email, setEmail] = useState("");
-  const [answers, setAnswers] = useState<string[]>([]);
-  const [questions, setQuestions] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
-  const supabase = createClientComponentClient();
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
 
-  const handleEmailSubmit = async () => {
-    try {
-      setLoading(true);
-      
-      // Get security questions for the email
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("security_questions(question)")
-        .eq("email", email)
-        .single();
-
-      if (!profile?.security_questions?.length) {
-        throw new Error("No security questions found for this email");
-      }
-
-      setQuestions(profile.security_questions.map((q: any) => q.question));
-      setAnswers(new Array(profile.security_questions.length).fill(""));
-      setStep("questions");
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRecovery = async () => {
+  const handleRecovery = async (e: React.FormEvent) => {
+    e.preventDefault();
     try {
       setLoading(true);
 
-      // Validate answers
-      if (answers.some((a) => !a)) {
-        throw new Error("Please answer all security questions");
-      }
-
-      const response = await fetch("/api/auth/recover", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, answers }),
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/reset-password`,
       });
 
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error);
+      if (error) throw error;
 
       toast({
-        title: "Success",
-        description: "Recovery email has been sent to your inbox",
+        title: "Recovery email sent",
+        description: "Check your email for the recovery link",
       });
-
       onOpenChange(false);
     } catch (error: any) {
       toast({
@@ -90,80 +53,29 @@ export default function AccountRecovery({
     }
   };
 
-  const handleAnswerChange = (index: number, value: string) => {
-    const newAnswers = [...answers];
-    newAnswers[index] = value;
-    setAnswers(newAnswers);
-  };
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Account Recovery</DialogTitle>
+          <DialogTitle>Reset Password</DialogTitle>
         </DialogHeader>
-
-        <div className="space-y-4">
-          {step === "email" ? (
-            <>
-              <p className="text-sm text-muted-foreground">
-                Enter your email address to start the account recovery process.
-              </p>
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter your email"
-                />
-              </div>
-              <Button
-                className="w-full"
-                onClick={handleEmailSubmit}
-                disabled={loading || !email}
-              >
-                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Continue
-              </Button>
-            </>
-          ) : (
-            <>
-              <p className="text-sm text-muted-foreground">
-                Please answer your security questions to recover your account.
-              </p>
-              {questions.map((question, index) => (
-                <div key={index} className="space-y-2">
-                  <Label>{question}</Label>
-                  <Input
-                    value={answers[index]}
-                    onChange={(e) => handleAnswerChange(index, e.target.value)}
-                    placeholder="Your answer"
-                    type="password"
-                  />
-                </div>
-              ))}
-              <div className="flex space-x-2">
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => setStep("email")}
-                >
-                  Back
-                </Button>
-                <Button
-                  className="w-full"
-                  onClick={handleRecovery}
-                  disabled={loading || answers.some((a) => !a)}
-                >
-                  {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Recover Account
-                </Button>
-              </div>
-            </>
-          )}
-        </div>
+        <form onSubmit={handleRecovery} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="recovery-email">Email</Label>
+            <Input
+              id="recovery-email"
+              type="email"
+              placeholder="m@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </div>
+          <Button type="submit" className="w-full" disabled={loading}>
+            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Send Recovery Email
+          </Button>
+        </form>
       </DialogContent>
     </Dialog>
   );

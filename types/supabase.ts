@@ -9,45 +9,68 @@ export type Json =
 export interface Database {
   public: {
     Tables: {
-      profiles: {
+      hero_content: {
         Row: {
           id: string
+          title: string
+          description: string
           created_at: string
           updated_at: string
-          full_name: string
-          avatar_url: string | null
-          phone_number: string | null
-          date_of_birth: string | null
-          nationality: string | null
-          address: string | null
-          role: 'admin' | 'user'
-          last_active: string | null
         }
         Insert: {
-          id: string
+          id?: string
+          title: string
+          description: string
           created_at?: string
           updated_at?: string
-          full_name: string
-          avatar_url?: string | null
-          phone_number?: string | null
-          date_of_birth?: string | null
-          nationality?: string | null
-          address?: string | null
-          role?: 'admin' | 'user'
-          last_active?: string | null
         }
         Update: {
           id?: string
+          title?: string
+          description?: string
           created_at?: string
           updated_at?: string
+        }
+      }
+      profiles: {
+        Row: {
+          id: string
+          email: string
+          full_name: string
+          role: string
+          balance: number
+          daily_limit: number
+          monthly_limit: number
+          send_limit: number
+          withdraw_limit: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id: string
+          email: string
+          full_name: string
+          role?: string
+          balance?: number
+          daily_limit?: number
+          monthly_limit?: number
+          send_limit?: number
+          withdraw_limit?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          email?: string
           full_name?: string
-          avatar_url?: string | null
-          phone_number?: string | null
-          date_of_birth?: string | null
-          nationality?: string | null
-          address?: string | null
-          role?: 'admin' | 'user'
-          last_active?: string | null
+          role?: string
+          balance?: number
+          daily_limit?: number
+          monthly_limit?: number
+          send_limit?: number
+          withdraw_limit?: number
+          created_at?: string
+          updated_at?: string
         }
       }
       transactions: {
@@ -87,7 +110,14 @@ export interface Database {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      check_database_health: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          status: string
+          message: string
+          timestamp: string
+        }
+      }
     }
     Enums: {
       [_ in never]: never
