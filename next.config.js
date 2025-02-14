@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   experimental: {
-    webpackBuildWorker: false,
+    webpackBuildWorker: true,
     parallelServerCompiles: false,
     parallelServerBuildTraces: false,
     serverComponentsExternalPackages: [
@@ -13,6 +13,7 @@ const nextConfig = {
       'geoip-lite'
     ]
   },
+  output: 'standalone',
   typescript: {
     ignoreBuildErrors: true // Temporarily ignore TS errors to get the build working
   },
@@ -21,7 +22,7 @@ const nextConfig = {
   },
   swcMinify: true,
   images: {
-    domains: ['*'], // Update this with your actual image domains
+    domains: ['udmfczwihczfijsqrrnl.supabase.co'],
   },
   webpack: (config, { isServer }) => {
     if (!isServer) {
@@ -57,7 +58,38 @@ const nextConfig = {
     '@radix-ui/react-scroll-area',
     '@radix-ui/react-select',
     '@radix-ui/react-switch'
-  ]
+  ],
+  async headers() {
+    return [
+      {
+        source: '/api/:path*',
+        headers: [
+          { key: 'Access-Control-Allow-Credentials', value: 'true' },
+          { key: 'Access-Control-Allow-Origin', value: '*' },
+          { key: 'Access-Control-Allow-Methods', value: 'GET,DELETE,PATCH,POST,PUT' },
+          { key: 'Access-Control-Allow-Headers', value: 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version' },
+        ],
+      },
+    ]
+  },
+  // Disable static page generation for API routes
+  rewrites() {
+    return {
+      beforeFiles: [
+        {
+          source: '/api/:path*',
+          destination: '/api/:path*',
+          has: [
+            {
+              type: 'header',
+              key: 'x-skip-static',
+              value: '1'
+            }
+          ]
+        }
+      ]
+    }
+  }
 }
 
 module.exports = nextConfig 
