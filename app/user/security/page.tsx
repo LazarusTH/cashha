@@ -3,6 +3,8 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import SecurityDashboard from "@/components/security/security-dashboard";
 
+export const dynamic = "force-dynamic";
+
 export default async function SecurityPage() {
   const supabase = createServerComponentClient({ cookies });
   const { data: { session } } = await supabase.auth.getSession();

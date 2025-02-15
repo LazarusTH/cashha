@@ -37,7 +37,7 @@ export default function SendPage() {
     fetchHistory()
     fetchUserLimits()
     fetchRateLimitInfo()
-  }, [])
+  }, [fetchHistory, fetchUserLimits, fetchRateLimitInfo])
 
   const fetchUserLimits = async () => {
     try {

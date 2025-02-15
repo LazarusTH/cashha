@@ -134,59 +134,71 @@ export default function UserDashboard() {
   // Subscribe to real-time updates
   useEffect(() => {
     const setupSubscriptions = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
 
-      const balanceChannel = supabase
-        .channel('balance_updates')
-        .on('postgres_changes', {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'balances',
-          filter: `user_id=eq.${user.id}`,
-        }, () => {
-          fetchDashboardData()
+        const balanceChannel = supabase
+          .channel('balance_updates')
+          .on('postgres_changes', {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'balances',
+            filter: `user_id=eq.${user.id}`,
+          }, () => {
+            fetchDashboardData()
+          })
+          .subscribe()
+
+        const notificationChannel = supabase
+          .channel('user_notifications')
+          .on('postgres_changes', {
+            event: '*',
+            schema: 'public',
+            table: 'notifications',
+            filter: `user_id=eq.${user.id}`,
+          }, () => {
+            fetchNotifications()
+          })
+          .subscribe()
+
+        const activityChannel = supabase
+          .channel('user_activity')
+          .on('postgres_changes', {
+            event: '*',
+            schema: 'public',
+            table: 'activity_log',
+            filter: `user_id=eq.${user.id}`,
+          }, () => {
+            fetchRecentActivity()
+          })
+          .subscribe()
+
+        return () => {
+          balanceChannel.unsubscribe()
+          notificationChannel.unsubscribe()
+          activityChannel.unsubscribe()
+        }
+      } catch (error) {
+        console.error('Error setting up subscriptions:', error)
+        toast({
+          title: 'Error',
+          description: 'Failed to setup real-time updates',
+          variant: 'destructive',
         })
-        .subscribe()
-
-      const notificationChannel = supabase
-        .channel('user_notifications')
-        .on('postgres_changes', {
-          event: '*',
-          schema: 'public',
-          table: 'notifications',
-          filter: `user_id=eq.${user.id}`,
-        }, () => {
-          fetchNotifications()
-        })
-        .subscribe()
-
-      const activityChannel = supabase
-        .channel('user_activity')
-        .on('postgres_changes', {
-          event: '*',
-          schema: 'public',
-          table: 'activity_log',
-          filter: `user_id=eq.${user.id}`,
-        }, () => {
-          fetchRecentActivity()
-        })
-        .subscribe()
-
-      return () => {
-        balanceChannel.unsubscribe()
-        notificationChannel.unsubscribe()
-        activityChannel.unsubscribe()
       }
     }
 
-    setupSubscriptions()
-  }, [])
+    const cleanup = setupSubscriptions()
+    return () => {
+      cleanup.then(unsubscribe => unsubscribe?.())
+    }
+  }, [supabase, fetchDashboardData, fetchNotifications, fetchRecentActivity, toast])
 
   // Initial data fetch
   useEffect(() => {
     fetchDashboardData()
-  }, [])
+  }, [fetchDashboardData])
 
   // Fetch user limits
   useEffect(() => {
@@ -206,17 +218,21 @@ export default function UserDashboard() {
         const today = new Date()
         const thisMonth = today.getMonth()
         
-        const { data: todayTransactions } = await supabase
+        const { data: todayTransactions, error: todayError } = await supabase
           .from('transactions')
           .select('amount')
           .eq('user_id', data.user.id)
           .gte('created_at', today.toISOString().split('T')[0])
 
-        const { data: monthTransactions } = await supabase
+        if (todayError) throw todayError
+
+        const { data: monthTransactions, error: monthError } = await supabase
           .from('transactions')
           .select('amount')
           .eq('user_id', data.user.id)
           .gte('created_at', new Date(today.getFullYear(), thisMonth, 1).toISOString())
+
+        if (monthError) throw monthError
 
         const dailyTotal = todayTransactions?.reduce((sum, tx) => sum + tx.amount, 0) || 0
         const monthlyTotal = monthTransactions?.reduce((sum, tx) => sum + tx.amount, 0) || 0
@@ -229,11 +245,16 @@ export default function UserDashboard() {
         })
       } catch (error) {
         console.error('Error fetching user limits:', error)
+        toast({
+          title: 'Error',
+          description: 'Failed to fetch user limits',
+          variant: 'destructive',
+        })
       }
     }
 
     fetchLimits()
-  }, [data?.user])
+  }, [data?.user, supabase, toast])
 
   const fetchNotifications = async () => {
     if (!data?.user) return

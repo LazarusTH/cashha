@@ -1,3 +1,5 @@
+'use client';
+
 import { useCallback, useEffect, useState } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { useRouter } from 'next/navigation'
@@ -8,6 +10,7 @@ export function useAuth() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<any>(null)
+  const [error, setError] = useState<Error | null>(null)
 
   useEffect(() => {
     const getUser = async () => {
@@ -15,7 +18,9 @@ export function useAuth() {
         const { data: { user }, error } = await supabase.auth.getUser()
         if (error) throw error
         setUser(user)
+        setError(null)
       } catch (error) {
+        setError(error instanceof Error ? error : new Error('Failed to get user'))
         handleAuthError(error)
       } finally {
         setLoading(false)
@@ -26,13 +31,19 @@ export function useAuth() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        if (session?.user) {
-          setUser(session.user)
-        } else {
-          setUser(null)
+        try {
+          if (session?.user) {
+            setUser(session.user)
+            setError(null)
+          } else {
+            setUser(null)
+          }
+          setLoading(false)
+          router.refresh()
+        } catch (error) {
+          setError(error instanceof Error ? error : new Error('Auth state change error'))
+          console.error('Auth state change error:', error)
         }
-        setLoading(false)
-        router.refresh()
       }
     )
 
@@ -43,19 +54,25 @@ export function useAuth() {
 
   const signIn = useCallback(async (email: string, password: string) => {
     try {
+      setLoading(true)
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password
       })
       if (error) throw error
       router.push('/user/dashboard')
+      setError(null)
     } catch (error) {
+      setError(new AppError('Invalid email or password', 401))
       throw new AppError('Invalid email or password', 401)
+    } finally {
+      setLoading(false)
     }
   }, [supabase, router])
 
   const signUp = useCallback(async (email: string, password: string, metadata: any) => {
     try {
+      setLoading(true)
       const { error } = await supabase.auth.signUp({
         email,
         password,
@@ -64,9 +81,13 @@ export function useAuth() {
         },
       })
       if (error) throw error
+      setError(null)
       return true
     } catch (error) {
-      throw new AppError('Failed to create account', 400)
+      setError(error instanceof Error ? error : new Error('Failed to sign up'))
+      throw error
+    } finally {
+      setLoading(false)
     }
   }, [supabase])
 
@@ -107,6 +128,7 @@ export function useAuth() {
   return {
     user,
     loading,
+    error,
     signIn,
     signUp,
     signOut,

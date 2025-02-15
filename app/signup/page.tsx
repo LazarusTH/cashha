@@ -11,7 +11,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { signUp } from "@/lib/supabase/client"
 import { createProfile } from "@/lib/supabase/profile"
 import { useFormValidation } from "@/lib/hooks/use-form-validation"
-import { toast } from "@/components/ui/use-toast"
+import { useToast } from "@/components/ui/use-toast"
 import { validateFileUpload } from "@/lib/utils/validation"
 
 export default function SignUp() {
@@ -43,6 +43,7 @@ export default function SignUp() {
     validateAddress,
     clearErrors 
   } = useFormValidation()
+  const { toast } = useToast()
 
   useEffect(() => {
     // Check if email is already registered
@@ -71,7 +72,7 @@ export default function SignUp() {
 
     const debounceTimer = setTimeout(checkEmail, 500)
     return () => clearTimeout(debounceTimer)
-  }, [formData.email])
+  }, [formData.email, toast])
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'idCard' | 'proofOfAddress') => {
     const file = e.target.files?.[0]

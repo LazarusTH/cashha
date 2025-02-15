@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 'use client'
 
 import { useState, useEffect } from "react"
@@ -21,14 +23,24 @@ export default function ProfilePage() {
     push: false,
     sms: false
   })
+  const [error, setError] = useState<Error | null>(null)
   const router = useRouter()
   const { toast } = useToast()
 
   useEffect(() => {
     if (!user) {
-      router.push('/signin')
+      try {
+        router.push('/signin')
+      } catch (error) {
+        console.error('Navigation error:', error)
+        toast({
+          title: 'Error',
+          description: 'Failed to redirect to signin page',
+          variant: 'destructive',
+        })
+      }
     }
-  }, [user])
+  }, [user, router, toast])
 
   const handleNotificationChange = async (type: string) => {
     try {

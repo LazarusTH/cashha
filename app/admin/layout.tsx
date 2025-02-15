@@ -55,7 +55,7 @@ import { useToast } from "@/components/ui/use-toast";
     return () => {
       authListener?.subscription.unsubscribe()
     }
-  }, [])
+  }, [router, supabase, toast])
 
   return <DashboardLayout>{children}</DashboardLayout>
 }

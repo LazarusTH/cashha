@@ -49,7 +49,7 @@ export default function SignIn() {
     if (email) {
       checkBlockStatus()
     }
-  }, [email])
+  }, [email, setIsBlocked, setBlockExpiry])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

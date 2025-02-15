@@ -1,10 +1,17 @@
 'use client'
 
-'use client'
-
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '@/lib/supabase/auth-context'
 import { useToast } from '@/components/ui/use-toast';
+
+interface Transaction {
+  id: string
+  amount: number
+  status: 'pending' | 'completed' | 'failed'
+  created_at: string
+  payment_method: string
+  description?: string
+}
 
 export interface DepositFormData {
     amount: number
@@ -15,9 +22,19 @@ export interface DepositFormData {
 export function useDeposit() {
   const { user } = useAuth()
   const [loading, setLoading] = useState(false)
-  const [history, setHistory] = useState<any[]>([])
+  const [history, setHistory] = useState<Transaction[]>([])
   const { toast } = useToast()
   const [historyLoading, setHistoryLoading] = useState(true)
+  const [abortController, setAbortController] = useState<AbortController | null>(null)
+
+  useEffect(() => {
+    // Cleanup function to abort any pending requests
+    return () => {
+      if (abortController) {
+        abortController.abort()
+      }
+    }
+  }, [abortController])
 
   const submitDeposit = async (data: DepositFormData) => {
     if (!user) {
@@ -30,6 +47,9 @@ export function useDeposit() {
     }
 
     setLoading(true)
+    const controller = new AbortController()
+    setAbortController(controller)
+
     try {
       const response = await fetch('/api/user/deposits', {
         method: 'POST',
@@ -37,6 +57,7 @@ export function useDeposit() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(data),
+        signal: controller.signal,
       })
 
       if (!response.ok) {
@@ -50,9 +71,13 @@ export function useDeposit() {
       })
 
       // Refresh history
-      fetchHistory()
+      await fetchHistory()
       return true
     } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        // Request was aborted, do nothing
+        return false
+      }
       console.error('Deposit error:', error)
       toast({
         title: "Error",
@@ -62,6 +87,7 @@ export function useDeposit() {
       return false
     } finally {
       setLoading(false)
+      setAbortController(null)
     }
   }
 
@@ -69,8 +95,14 @@ export function useDeposit() {
     if (!user) return
 
     setHistoryLoading(true)
+    const controller = new AbortController()
+    setAbortController(controller)
+
     try {
-      const response = await fetch('/api/user/deposits')
+      const response = await fetch('/api/user/deposits', {
+        signal: controller.signal,
+      })
+
       if (!response.ok) {
         const error = await response.json()
         throw new Error(error.message || 'Failed to fetch deposit history')
@@ -79,6 +111,10 @@ export function useDeposit() {
       const data = await response.json()
       setHistory(data)
     } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        // Request was aborted, do nothing
+        return
+      }
       console.error('Error fetching deposit history:', error)
       toast({
         title: "Error",
@@ -87,6 +123,7 @@ export function useDeposit() {
       })
     } finally {
       setHistoryLoading(false)
+      setAbortController(null)
     }
   }
 
