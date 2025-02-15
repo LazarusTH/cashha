@@ -4,7 +4,11 @@ import { NextResponse } from 'next/server'
 import { rateLimit } from '@/lib/utils/rate-limit'
 
 export async function POST(req: Request) {
-  const rateLimitResponse = await rateLimit(req.headers.get('x-forwarded-for') || 'unknown', 5)
+  const rateLimitResponse = await rateLimit({
+    ip: req.headers.get('x-forwarded-for') || 'unknown',
+    limit: 5,
+    duration: 3600 // 1 hour
+  })
   if (rateLimitResponse) return rateLimitResponse
 
   try {
@@ -22,17 +26,20 @@ export async function POST(req: Request) {
     })
   } catch (error: any) {
     console.error('Password reset error:', error)
-    return new NextResponse(JSON.stringify({ 
+    return NextResponse.json({ 
       error: error.message || 'Failed to send reset instructions' 
-    }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' }
+    }, {
+      status: 400
     })
   }
 }
 
 export async function PUT(req: Request) {
-  const rateLimitResponse = await rateLimit(req.headers.get('x-forwarded-for') || 'unknown', 5)
+  const rateLimitResponse = await rateLimit({
+    ip: req.headers.get('x-forwarded-for') || 'unknown',
+    limit: 5,
+    duration: 3600 // 1 hour
+  })
   if (rateLimitResponse) return rateLimitResponse
 
   try {
@@ -50,11 +57,10 @@ export async function PUT(req: Request) {
     })
   } catch (error: any) {
     console.error('Password update error:', error)
-    return new NextResponse(JSON.stringify({ 
+    return NextResponse.json({ 
       error: error.message || 'Failed to update password' 
-    }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' }
+    }, {
+      status: 400
     })
   }
 }

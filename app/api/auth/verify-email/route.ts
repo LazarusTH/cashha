@@ -8,11 +8,10 @@ export async function GET(req: Request) {
   const type = searchParams.get('type')
 
   if (!token || type !== 'email_verification') {
-    return new NextResponse(JSON.stringify({ 
+    return NextResponse.json({ 
       error: 'Invalid verification link' 
-    }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' }
+    }, {
+      status: 400
     })
   }
 
@@ -31,11 +30,10 @@ export async function GET(req: Request) {
     })
   } catch (error: any) {
     console.error('Email verification error:', error)
-    return new NextResponse(JSON.stringify({ 
+    return NextResponse.json({ 
       error: error.message || 'Failed to verify email' 
-    }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' }
+    }, {
+      status: 400
     })
   }
 }
