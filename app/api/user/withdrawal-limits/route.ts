@@ -1,5 +1,3 @@
-export const dynamic = 'force-dynamic'
-
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
@@ -56,6 +54,8 @@ export async function GET() {
     return NextResponse.json({
       minAmount: userLimits?.min_withdrawal_amount || 100,
       maxAmount: userLimits?.max_withdrawal_amount || 50000,
+
+export const dynamic = 'force-dynamic'
       dailyLimit: userLimits?.daily_withdrawal_limit || 25000,
       dailyUsed,
       monthlyLimit: userLimits?.monthly_withdrawal_limit || 500000,

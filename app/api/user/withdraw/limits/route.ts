@@ -1,6 +1,8 @@
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
+
+export const dynamic = 'force-dynamic'
 import { withAuth } from '@/middleware/auth'
 import { rateLimit } from '@/lib/utils/rate-limit'
 

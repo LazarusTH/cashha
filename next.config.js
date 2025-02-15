@@ -12,7 +12,8 @@ const nextConfig = {
       'uuid',
       'geoip-lite'
     ],
-    instrumentationHook: true
+    instrumentationHook: true,
+    unstable_excludeFiles: ['app/api/**/*']
   },
   output: 'standalone',
   typescript: {

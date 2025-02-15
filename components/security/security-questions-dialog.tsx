@@ -36,7 +36,7 @@ const AVAILABLE_QUESTIONS = [
   "What was your first car?",
 ];
 
-export default function SecurityQuestionsDialog({
+function SecurityQuestionsDialog({
   open,
   onOpenChange,
   existingQuestions = [],
@@ -210,3 +210,5 @@ export default function SecurityQuestionsDialog({
     </Dialog>
   );
 }
+
+export default SecurityQuestionsDialog
