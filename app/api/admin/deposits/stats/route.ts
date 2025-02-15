@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
@@ -5,8 +7,16 @@ import { withAdmin } from '@/middleware/admin'
 import { rateLimit } from '@/lib/utils/rate-limit'
 
 export const GET = withAdmin(async (req: Request) => {
-  const rateLimitResponse = await rateLimit(req.headers.get('x-forwarded-for') || 'unknown')
-  if (rateLimitResponse) return rateLimitResponse
+  // Apply rate limiting with proper configuration object
+  const rateLimitResult = await rateLimit({
+    ip: req.headers.get('x-forwarded-for') || 'unknown',
+    limit: 60,
+    duration: 60 // 1 minute
+  })
+  
+  if (rateLimitResult) {
+    return rateLimitResult
+  }
 
   try {
     const supabase = createRouteHandlerClient({ cookies })
@@ -17,7 +27,7 @@ export const GET = withAdmin(async (req: Request) => {
 
     // Get total deposits
     const { data: totalDeposits, error: totalError } = await supabase
-      .from('deposit_requests')
+      .from('deposits')
       .select('amount, status')
       .gte('created_at', startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
       .lte('created_at', endDate || new Date().toISOString())
@@ -36,29 +46,43 @@ export const GET = withAdmin(async (req: Request) => {
         .reduce((sum, d) => sum + d.amount, 0),
       pending_count: totalDeposits.filter(d => d.status === 'pending').length,
       pending_amount: totalDeposits.filter(d => d.status === 'pending')
-        .reduce((sum, d) => sum + d.amount, 0),
+        .reduce((sum, d) => sum + d.amount, 0)
     }
 
-    // Get deposits by date
-    const { data: depositsByDate, error: timelineError } = await supabase.rpc(
-      'get_deposits_timeline',
-      {
-        p_period: period,
-        p_start_date: startDate,
-        p_end_date: endDate
-      }
-    )
+    // Get trend data based on period
+    let interval: string
+    switch (period) {
+      case 'week':
+        interval = '1 day'
+        break
+      case 'month':
+        interval = '1 week'
+        break
+      case 'year':
+        interval = '1 month'
+        break
+      default:
+        interval = '1 hour'
+    }
 
-    if (timelineError) throw timelineError
+    const { data: trendData, error: trendError } = await supabase
+      .rpc('get_deposit_trends', {
+        p_start_date: startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+        p_end_date: endDate || new Date().toISOString(),
+        p_interval: interval
+      })
+
+    if (trendError) throw trendError
 
     return NextResponse.json({
       stats,
-      timeline: depositsByDate
+      trends: trendData || []
     })
+
   } catch (error: any) {
     console.error('Deposit stats error:', error)
-    return new NextResponse(JSON.stringify({ 
-      error: error.message || 'Failed to fetch deposit stats' 
-    }), { status: 500 })
+    return NextResponse.json({ 
+      error: error.message || 'Failed to fetch deposit statistics' 
+    }, { status: 500 })
   }
 })
