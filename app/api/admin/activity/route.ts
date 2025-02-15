@@ -4,6 +4,8 @@ import { NextResponse } from 'next/server'
 import { withAdmin } from '@/middleware/admin'
 import { rateLimit } from '@/lib/utils/rate-limit'
 
+export const dynamic = 'force-dynamic'
+
 export const GET = withAdmin(async (req: Request) => {
   const rateLimitResponse = await rateLimit(req.headers.get('x-forwarded-for') || 'unknown')
   if (rateLimitResponse) return rateLimitResponse

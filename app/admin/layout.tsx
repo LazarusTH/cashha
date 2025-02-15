@@ -1,11 +1,10 @@
+// Force dynamic rendering
+export const dynamic = "force-dynamic";
+
 import { createServerComponentClient } from "@supabase/auth-helpers-nextjs";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import AdminLayoutClient from "@/components/admin/admin-layout-client";
-
-// Force dynamic rendering
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
 
 export default async function AdminLayout({
   children,

@@ -11,7 +11,8 @@ const nextConfig = {
       'ua-parser-js',
       'uuid',
       'geoip-lite'
-    ]
+    ],
+    instrumentationHook: true
   },
   output: 'standalone',
   typescript: {
@@ -88,6 +89,11 @@ const nextConfig = {
           ]
         }
       ]
+    }
+  },
+  logging: {
+    fetches: {
+      fullUrl: true
     }
   }
 }

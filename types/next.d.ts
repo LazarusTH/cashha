@@ -10,5 +10,17 @@ declare module 'next/headers' {
 declare module 'next/server' {
   export class NextResponse extends Response {
     static json(body: any, init?: ResponseInit): NextResponse
+    static next(): NextResponse
+    static redirect(url: string | URL, init?: number | ResponseInit): NextResponse
+  }
+
+  export class NextRequest extends Request {
+    nextUrl: URL
+    ip?: string
+    geo?: {
+      city?: string
+      country?: string
+      region?: string
+    }
   }
 } 
