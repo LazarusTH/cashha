@@ -2,6 +2,10 @@ import { Suspense } from 'react'
 import { DashboardClient } from './client'
 import { Skeleton } from '@/components/ui/skeleton'
 
+// Force dynamic rendering at runtime
+export const dynamic = "force-dynamic";
+export const runtime = "edge";
+
 export default function AdminDashboard() {
   return (
     <Suspense fallback={<DashboardSkeleton />}>
