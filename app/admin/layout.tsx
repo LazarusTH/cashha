@@ -1,61 +1,32 @@
-"use client";
+import { createServerComponentClient } from "@supabase/auth-helpers-nextjs";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import AdminLayoutClient from "@/components/admin/admin-layout-client";
 
-import AdminSidebar from "@/components/admin/AdminSidebar"
-import type React, { useEffect } from "react"
-import { DashboardLayout } from "@/components/dashboard/layout"
-import { supabase } from "@/lib/supabase"
-import { useRouter } from "next/navigation"
-import { useToast } from "@/components/ui/use-toast";
+export const dynamic = "force-dynamic";
 
-  export default function AdminLayout({
+export default async function AdminLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: React.ReactNode;
 }) {
-  const router = useRouter()
-  const { toast } = useToast()
+  const supabase = createServerComponentClient({ cookies });
+  const { data: { session } } = await supabase.auth.getSession();
 
-  useEffect(() => {
-    const checkSession = async () => {
-      try {
-        const session = await supabase.auth.getSession()
-        if (!session.data.session) {
-          router.push('/signin')
-          return
-        }
+  if (!session) {
+    redirect("/auth/login");
+  }
 
-        const { data: profile, error } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', session.data.session.user.id)
-          .single()
+  // Check if user is admin
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", session.user.id)
+    .single();
 
-        if (error || !profile || profile.role !== 'admin') {
-          toast({
-            title: 'Access Denied',
-            description: 'You do not have permission to access this area',
-            variant: 'destructive',
-          })
-          router.push('/user/dashboard')
-        }
-      } catch (error) {
-        console.error('Session check error:', error)
-        router.push('/signin')
-      }
-    }
+  if (!profile || profile.role !== "admin") {
+    redirect("/user/dashboard");
+  }
 
-    checkSession()
-
-    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_OUT' || !session) {
-        router.push('/signin')
-      }
-    })
-
-    return () => {
-      authListener?.subscription.unsubscribe()
-    }
-  }, [router, supabase, toast])
-
-  return <DashboardLayout>{children}</DashboardLayout>
+  return <AdminLayoutClient>{children}</AdminLayoutClient>;
 }

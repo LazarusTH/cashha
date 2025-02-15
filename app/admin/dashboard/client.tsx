@@ -20,7 +20,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { supabase } from "@/lib/supabase"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 
 interface MetricCardProps {
   title: string
@@ -91,33 +91,10 @@ export function DashboardClient() {
     chartData: [],
     supportRequests: [],
   })
-  const [loading, setLoading] = useState(true)
   const [timeRange, setTimeRange] = useState("7d")
+  const [loading, setLoading] = useState(true)
   const { toast } = useToast()
-
-  useEffect(() => {
-    const notificationChannel = supabase
-      .channel('admin_notifications')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'transactions',
-      }, () => {
-        fetchDashboardData()
-      })
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'support_requests',
-      }, () => {
-        fetchDashboardData()
-      })
-      .subscribe()
-
-    return () => {
-      notificationChannel.unsubscribe()
-    }
-  }, [])
+  const supabase = createClientComponentClient()
 
   useEffect(() => {
     fetchDashboardData()
@@ -125,60 +102,107 @@ export function DashboardClient() {
 
   const fetchDashboardData = async () => {
     try {
-      const response = await fetch(`/api/admin/dashboard?timeRange=${timeRange}`)
-      const data = await response.json()
+      setLoading(true)
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to fetch dashboard data')
-      }
+      // Fetch metrics
+      const [
+        { data: users },
+        { data: deposits },
+        { data: withdrawals },
+        { data: sendingRequests },
+      ] = await Promise.all([
+        supabase.from("profiles").select("id", { count: "exact" }),
+        supabase.from("deposits").select("amount"),
+        supabase.from("withdrawals").select("amount"),
+        supabase.from("sending_requests").select("amount"),
+      ])
 
-      setDashboardData(data)
+      // Fetch recent transactions
+      const { data: transactions } = await supabase
+        .from("transactions")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(10)
+
+      // Fetch chart data
+      const { data: chartData } = await supabase
+        .from("transactions")
+        .select("*")
+        .gte("created_at", getDateFromRange(timeRange))
+        .order("created_at", { ascending: true })
+
+      // Fetch support requests
+      const { data: supportRequests } = await supabase
+        .from("support_requests")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(5)
+
+      setDashboardData({
+        metrics: {
+          totalUsers: users?.length || 0,
+          totalDeposits: deposits?.reduce((sum, d) => sum + d.amount, 0) || 0,
+          totalWithdrawals: withdrawals?.reduce((sum, w) => sum + w.amount, 0) || 0,
+          totalSendingRequests: sendingRequests?.length || 0,
+        },
+        recentTransactions: transactions || [],
+        chartData: processChartData(chartData || []),
+        supportRequests: supportRequests || [],
+      })
     } catch (error) {
-      console.error('Error fetching dashboard data:', error)
+      console.error("Error fetching dashboard data:", error)
       toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to fetch dashboard data',
-        variant: 'destructive',
+        title: "Error",
+        description: "Failed to fetch dashboard data",
+        variant: "destructive",
       })
     } finally {
       setLoading(false)
     }
   }
 
-  const handleSupportRequestUpdate = async (requestId: number, status: string, response?: string) => {
-    try {
-      const res = await fetch(`/api/admin/support/${requestId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ status, response }),
-      })
-
-      if (!res.ok) {
-        throw new Error('Failed to update support request')
-      }
-
-      // Update local state
-      setDashboardData(prev => ({
-        ...prev,
-        supportRequests: prev.supportRequests.map(request =>
-          request.id === requestId ? { ...request, status } : request
-        ),
-      }))
-
-      toast({
-        title: 'Success',
-        description: 'Support request updated successfully',
-      })
-    } catch (error) {
-      console.error('Error updating support request:', error)
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to update support request',
-        variant: 'destructive',
-      })
+  const getDateFromRange = (range: string) => {
+    const now = new Date()
+    switch (range) {
+      case "7d":
+        return new Date(now.setDate(now.getDate() - 7))
+      case "30d":
+        return new Date(now.setDate(now.getDate() - 30))
+      case "90d":
+        return new Date(now.setDate(now.getDate() - 90))
+      case "1y":
+        return new Date(now.setFullYear(now.getFullYear() - 1))
+      default:
+        return new Date(now.setDate(now.getDate() - 7))
     }
+  }
+
+  const processChartData = (data: any[]) => {
+    // Group transactions by date and type
+    const groupedData = data.reduce((acc: any, transaction: any) => {
+      const date = new Date(transaction.created_at).toLocaleDateString()
+      if (!acc[date]) {
+        acc[date] = { deposits: 0, withdrawals: 0, sends: 0 }
+      }
+      switch (transaction.type) {
+        case "deposit":
+          acc[date].deposits += transaction.amount
+          break
+        case "withdrawal":
+          acc[date].withdrawals += transaction.amount
+          break
+        case "send":
+          acc[date].sends += transaction.amount
+          break
+      }
+      return acc
+    }, {})
+
+    // Convert to array format for chart
+    return Object.entries(groupedData).map(([date, values]: [string, any]) => ({
+      date,
+      ...values,
+    }))
   }
 
   return (
@@ -276,34 +300,53 @@ export function DashboardClient() {
             <CardTitle>Recent Transactions</CardTitle>
           </CardHeader>
           <CardContent>
-            {loading ? (
-              <div className="space-y-2">
-                {[...Array(5)].map((_, i) => (
-                  <Skeleton key={i} className="h-12 w-full" />
-                ))}
-              </div>
-            ) : (
+            <ScrollArea className="h-[300px]">
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>User</TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead>Amount</TableHead>
-                    <TableHead>User</TableHead>
                     <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {dashboardData.recentTransactions.map((transaction) => (
-                    <TableRow key={transaction.id}>
-                      <TableCell>{transaction.type}</TableCell>
-                      <TableCell>{transaction.amount.toLocaleString()} ETB</TableCell>
-                      <TableCell>{transaction.username}</TableCell>
-                      <TableCell>{transaction.status}</TableCell>
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={4}>
+                        <Skeleton className="h-10 w-full" />
+                      </TableCell>
                     </TableRow>
-                  ))}
+                  ) : (
+                    dashboardData.recentTransactions.map((transaction) => (
+                      <TableRow key={transaction.id}>
+                        <TableCell>{transaction.username}</TableCell>
+                        <TableCell className="capitalize">{transaction.type}</TableCell>
+                        <TableCell>
+                          {new Intl.NumberFormat('en-US', {
+                            style: 'currency',
+                            currency: 'ETB',
+                          }).format(transaction.amount)}
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={
+                              transaction.status === 'completed'
+                                ? 'success'
+                                : transaction.status === 'pending'
+                                ? 'warning'
+                                : 'destructive'
+                            }
+                          >
+                            {transaction.status}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
-            )}
+            </ScrollArea>
           </CardContent>
         </Card>
 
@@ -312,58 +355,48 @@ export function DashboardClient() {
             <CardTitle>Support Requests</CardTitle>
           </CardHeader>
           <CardContent>
-            {loading ? (
-              <div className="space-y-2">
-                {[...Array(5)].map((_, i) => (
-                  <Skeleton key={i} className="h-12 w-full" />
-                ))}
+            <ScrollArea className="h-[300px]">
+              <div className="space-y-4">
+                {loading ? (
+                  Array(3)
+                    .fill(null)
+                    .map((_, i) => (
+                      <Skeleton key={i} className="h-20 w-full" />
+                    ))
+                ) : (
+                  dashboardData.supportRequests.map((request) => (
+                    <div
+                      key={request.id}
+                      className="flex flex-col space-y-2 rounded-lg border p-4"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium">{request.username}</span>
+                        <Badge
+                          variant={
+                            request.status === 'resolved'
+                              ? 'success'
+                              : request.status === 'pending'
+                              ? 'warning'
+                              : 'default'
+                          }
+                        >
+                          {request.status}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground">{request.subject}</p>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(request.date).toLocaleDateString()}
+                        </span>
+                        <Button variant="outline" size="sm">
+                          View Details
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
-            ) : (
-              <ScrollArea className="h-[400px]">
-                <div className="space-y-4">
-                  {dashboardData.supportRequests.map((request) => (
-                    <Card key={request.id}>
-                      <CardHeader className="p-4">
-                        <div className="flex items-center justify-between">
-                          <div className="space-y-1">
-                            <CardTitle className="text-sm font-medium">
-                              {request.username} - {request.subject}
-                            </CardTitle>
-                            <div className="text-sm text-muted-foreground">
-                              {new Date(request.date).toLocaleString()}
-                            </div>
-                          </div>
-                          <Badge
-                            variant={
-                              request.status === 'pending'
-                                ? 'default'
-                                : request.status === 'resolved'
-                                ? 'success'
-                                : 'destructive'
-                            }
-                          >
-                            {request.status}
-                          </Badge>
-                        </div>
-                      </CardHeader>
-                      <CardContent className="p-4 pt-0">
-                        <p className="text-sm">{request.message}</p>
-                        {request.status === 'pending' && (
-                          <div className="mt-4 flex justify-end space-x-2">
-                            <Button
-                              variant="outline"
-                              onClick={() => handleSupportRequestUpdate(request.id, 'resolved')}
-                            >
-                              Mark as Resolved
-                            </Button>
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </ScrollArea>
-            )}
+            </ScrollArea>
           </CardContent>
         </Card>
       </div>

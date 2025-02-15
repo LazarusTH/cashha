@@ -1,20 +1,20 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { format } from "date-fns"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
-import Image from "next/image"
+import { Textarea } from "@/components/ui/textarea"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useToast } from "@/components/ui/use-toast"
+import { format } from "date-fns"
 
-interface DepositRequest {
+interface WithdrawalRequest {
   id: string
   user_id: string
   user: {
@@ -25,7 +25,9 @@ interface DepositRequest {
   amount: number
   status: "pending" | "approved" | "rejected"
   created_at: string
-  receipt_url: string
+  bank_name: string
+  account_number: string
+  account_holder_name: string
   transaction_id?: string
   processed_at?: string
   rejection_reason?: string
@@ -34,9 +36,9 @@ interface DepositRequest {
   }
 }
 
-export function DepositsClient() {
-  const [requests, setRequests] = useState<DepositRequest[]>([])
-  const [selectedRequest, setSelectedRequest] = useState<DepositRequest | null>(null)
+export function WithdrawalsClient() {
+  const [requests, setRequests] = useState<WithdrawalRequest[]>([])
+  const [selectedRequest, setSelectedRequest] = useState<WithdrawalRequest | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -44,19 +46,19 @@ export function DepositsClient() {
   const { toast } = useToast()
 
   useEffect(() => {
-    fetchDepositRequests()
+    fetchWithdrawalRequests()
   }, [])
 
-  const fetchDepositRequests = async () => {
+  const fetchWithdrawalRequests = async () => {
     try {
-      const response = await fetch('/api/admin/deposits')
+      const response = await fetch('/api/admin/withdrawals')
       if (!response.ok) {
-        throw new Error('Failed to fetch deposit requests')
+        throw new Error('Failed to fetch withdrawal requests')
       }
       const data = await response.json()
-      setRequests(data.deposits)
+      setRequests(data.withdrawals)
     } catch (err) {
-      console.error('Error fetching deposit requests:', err)
+      console.error('Error fetching withdrawal requests:', err)
       setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {
       setLoading(false)
@@ -65,30 +67,30 @@ export function DepositsClient() {
 
   const handleApprove = async (requestId: string, note: string) => {
     try {
-      const response = await fetch(`/api/admin/deposits/${requestId}/approve`, {
+      const response = await fetch(`/api/admin/withdrawals/${requestId}/approve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ note }),
       })
 
       if (!response.ok) {
-        throw new Error('Failed to approve deposit')
+        throw new Error('Failed to approve withdrawal')
       }
 
       const data = await response.json()
       setRequests(requests.map(request => 
-        request.id === requestId ? data.deposit : request
+        request.id === requestId ? data.withdrawal : request
       ))
       setIsDialogOpen(false)
       toast({
         title: "Success",
-        description: "Deposit request approved successfully",
+        description: "Withdrawal request approved successfully",
       })
     } catch (err) {
-      console.error('Error approving deposit:', err)
+      console.error('Error approving withdrawal:', err)
       toast({
         title: "Error",
-        description: "Failed to approve deposit",
+        description: "Failed to approve withdrawal",
         variant: "destructive",
       })
     }
@@ -96,30 +98,30 @@ export function DepositsClient() {
 
   const handleReject = async (requestId: string, reason: string) => {
     try {
-      const response = await fetch(`/api/admin/deposits/${requestId}/reject`, {
+      const response = await fetch(`/api/admin/withdrawals/${requestId}/reject`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reason }),
       })
 
       if (!response.ok) {
-        throw new Error('Failed to reject deposit')
+        throw new Error('Failed to reject withdrawal')
       }
 
       const data = await response.json()
       setRequests(requests.map(request => 
-        request.id === requestId ? data.deposit : request
+        request.id === requestId ? data.withdrawal : request
       ))
       setIsDialogOpen(false)
       toast({
         title: "Success",
-        description: "Deposit request rejected successfully",
+        description: "Withdrawal request rejected successfully",
       })
     } catch (err) {
-      console.error('Error rejecting deposit:', err)
+      console.error('Error rejecting withdrawal:', err)
       toast({
         title: "Error",
-        description: "Failed to reject deposit",
+        description: "Failed to reject withdrawal",
         variant: "destructive",
       })
     }
@@ -137,7 +139,7 @@ export function DepositsClient() {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Deposit Requests</CardTitle>
+          <CardTitle>Withdrawal Requests</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
@@ -145,6 +147,7 @@ export function DepositsClient() {
               <TableRow>
                 <TableHead>User</TableHead>
                 <TableHead>Amount</TableHead>
+                <TableHead>Bank</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Actions</TableHead>
@@ -153,7 +156,7 @@ export function DepositsClient() {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={5}>
+                  <TableCell colSpan={6}>
                     <Skeleton className="h-10 w-full" />
                   </TableCell>
                 </TableRow>
@@ -166,6 +169,7 @@ export function DepositsClient() {
                       currency: 'USD',
                     }).format(request.amount)}
                   </TableCell>
+                  <TableCell>{request.bank_name}</TableCell>
                   <TableCell>
                     <span className={`px-2 py-1 rounded-full text-sm ${
                       request.status === 'approved' ? 'bg-green-100 text-green-800' :
@@ -212,9 +216,9 @@ export function DepositsClient() {
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Review Deposit Request</DialogTitle>
+                <DialogTitle>Review Withdrawal Request</DialogTitle>
               </DialogHeader>
-              <DepositReviewForm
+              <WithdrawalReviewForm
                 request={selectedRequest}
                 onApprove={handleApprove}
                 onReject={handleReject}
@@ -225,9 +229,9 @@ export function DepositsClient() {
           <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Deposit Request Details</DialogTitle>
+                <DialogTitle>Withdrawal Request Details</DialogTitle>
               </DialogHeader>
-              <DepositDetailView request={selectedRequest} />
+              <WithdrawalDetailView request={selectedRequest} />
             </DialogContent>
           </Dialog>
         </>
@@ -236,12 +240,12 @@ export function DepositsClient() {
   )
 }
 
-function DepositReviewForm({
+function WithdrawalReviewForm({
   request,
   onApprove,
   onReject,
 }: {
-  request: DepositRequest
+  request: WithdrawalRequest
   onApprove: (requestId: string, note: string) => void
   onReject: (requestId: string, reason: string) => void
 }) {
@@ -287,14 +291,11 @@ function DepositReviewForm({
         </p>
       </div>
       <div className="space-y-2">
-        <Label>Receipt</Label>
-        <div className="relative h-[300px] w-full">
-          <Image
-            src={request.receipt_url}
-            alt="Deposit Receipt"
-            fill
-            className="object-contain"
-          />
+        <Label>Bank Details</Label>
+        <div className="space-y-1">
+          <p><strong>Bank:</strong> {request.bank_name}</p>
+          <p><strong>Account Number:</strong> {request.account_number}</p>
+          <p><strong>Account Holder:</strong> {request.account_holder_name}</p>
         </div>
       </div>
       <div className="space-y-2">
@@ -308,7 +309,7 @@ function DepositReviewForm({
       </div>
       <div className="space-y-2">
         <Label htmlFor="rejectionReason">Rejection Reason</Label>
-        <Input
+        <Textarea
           id="rejectionReason"
           value={rejectionReason}
           onChange={(e) => setRejectionReason(e.target.value)}
@@ -344,7 +345,7 @@ function DepositReviewForm({
   )
 }
 
-function DepositDetailView({ request }: { request: DepositRequest }) {
+function WithdrawalDetailView({ request }: { request: WithdrawalRequest }) {
   return (
     <ScrollArea className="h-[400px]">
       <div className="space-y-4">
@@ -364,6 +365,14 @@ function DepositDetailView({ request }: { request: DepositRequest }) {
               currency: 'USD',
             }).format(request.amount)}
           </p>
+        </div>
+        <div className="space-y-2">
+          <Label>Bank Details</Label>
+          <div className="space-y-1">
+            <p><strong>Bank:</strong> {request.bank_name}</p>
+            <p><strong>Account Number:</strong> {request.account_number}</p>
+            <p><strong>Account Holder:</strong> {request.account_holder_name}</p>
+          </div>
         </div>
         <div className="space-y-2">
           <Label>Status</Label>
@@ -403,17 +412,6 @@ function DepositDetailView({ request }: { request: DepositRequest }) {
             <p>{request.metadata.adminNote}</p>
           </div>
         )}
-        <div className="space-y-2">
-          <Label>Receipt</Label>
-          <div className="relative h-[300px] w-full">
-            <Image
-              src={request.receipt_url}
-              alt="Deposit Receipt"
-              fill
-              className="object-contain"
-            />
-          </div>
-        </div>
       </div>
     </ScrollArea>
   )
