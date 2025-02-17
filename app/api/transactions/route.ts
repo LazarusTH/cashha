@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { NextResponse } from 'next/server'
 import { getAllTransactions } from '@/lib/supabase/admin'
 import { adminAuthGuard } from '@/lib/auth'

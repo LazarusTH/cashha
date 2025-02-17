@@ -13,8 +13,7 @@ const nextConfig = {
       'geoip-lite'
     ],
     instrumentationHook: true,
-    unstable_excludeFiles: ['app/api/**/*']
-  },
+      },
   output: 'standalone',
   typescript: {
     ignoreBuildErrors: true // Temporarily ignore TS errors to get the build working
