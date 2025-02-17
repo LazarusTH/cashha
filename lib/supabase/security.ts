@@ -142,50 +142,28 @@ export async function logSecurityUpdate(userId: string, log: { type: string; cha
   if (error) throw error
 }
 
-export async function enable2FA(userId: string): Promise<{ secret: string; qrCode: string }> {
-  const response = await fetch('/api/auth/enable-2fa', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ userId }),
-  })
+export async function updateSecuritySettings(userId: string, settings: Partial<any>): Promise<void> {
+  const response = await fetch('/api/user/account/security', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId, settings }),
+  });
 
   if (!response.ok) {
-    throw new Error('Failed to enable 2FA')
+    const error = await response.json();
+    throw new Error(error.message || 'Failed to update security settings');
   }
-
-  return response.json()
 }
 
-export async function verify2FAToken(userId: string, token: string): Promise<boolean> {
-  const response = await fetch('/api/auth/verify-2fa', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ userId, token }),
-  })
+export async function getSecurityEvents(userId: string): Promise<any[]> {
+  const response = await fetch(`/api/user/account/security/events?userId=${userId}`);
 
   if (!response.ok) {
-    throw new Error('Failed to verify 2FA token')
+    const error = await response.json();
+    throw new Error(error.message || 'Failed to fetch security events');
   }
 
-  return response.json()
-}
-
-export async function disable2FA(userId: string, token: string): Promise<void> {
-  const response = await fetch('/api/auth/disable-2fa', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ userId, token }),
-  })
-
-  if (!response.ok) {
-    throw new Error('Failed to disable 2FA')
-  }
+  return response.json();
 }
 
 export async function requestPasswordReset(email: string): Promise<void> {

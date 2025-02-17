@@ -56,65 +56,96 @@ Export all user data in compliance with GDPR requirements.
   },
   "settings": {
     "daily_transfer_limit": 10000,
-    "monthly_transfer_limit": 100000,
-    "require_2fa": true
+    "monthly_transfer_limit": 100000
   },
   "exportDate": "string"
 }
 ```
 
-## Get Security Settings
-`GET /api/user/account/security`
+## Get Account Settings
+`GET /api/user/account/settings`
 
-Get user's security settings and recent security events.
+Get user's account settings and preferences.
 
 ### Response
 ```json
 {
   "settings": {
-    "require_2fa": true,
-    "last_security_review": "string"
-  },
-  "securityEvents": [
-    {
-      "action": "LOGIN_ATTEMPT",
-      "details": {
-        "success": true,
-        "ip_address": "string"
-      },
-      "created_at": "string"
-    }
-  ],
-  "factors": {
-    "totp": {
-      "id": "string",
-      "status": "enabled"
-    }
+    "email_notifications": true,
+    "login_alerts": true,
+    "transaction_alerts": true,
+    "marketing_emails": false
   }
 }
 ```
 
-## Update Security Settings
-`PUT /api/user/account/security`
+## Update Account Settings
+`PUT /api/user/account/settings`
 
-Update user's security settings and configure 2FA.
+Update user's account settings and preferences.
 
 ### Request Body
 ```json
 {
-  "require_2fa": true,
-  "daily_transfer_limit": 10000,
-  "monthly_transfer_limit": 100000
+  "email_notifications": true,
+  "login_alerts": true,
+  "transaction_alerts": true,
+  "marketing_emails": false
 }
 ```
 
 ### Response
 ```json
 {
-  "message": "Security settings updated",
-  "factorData": {
-    "qr": "string",
-    "secret": "string"
+  "message": "Settings updated successfully",
+  "settings": {
+    "email_notifications": true,
+    "login_alerts": true,
+    "transaction_alerts": true,
+    "marketing_emails": false
   }
+}
+```
+
+## Get Account Activity
+`GET /api/user/account/activity`
+
+Get user's recent account activity and security events.
+
+### Response
+```json
+{
+  "events": [
+    {
+      "type": "LOGIN",
+      "timestamp": "2025-02-17T13:30:00Z",
+      "details": {
+        "ip": "192.168.1.1",
+        "location": "New York, US",
+        "device": "Chrome on Windows"
+      }
+    }
+  ]
+}
+```
+
+## Close Account
+`POST /api/user/account/close`
+
+Close user's account and handle cleanup.
+
+### Request Body
+```json
+{
+  "reason": "No longer needed",
+  "feedback": "Great service but moving to a different solution"
+}
+```
+
+### Response
+```json
+{
+  "message": "Account closed successfully",
+  "closed_at": "2025-02-17T13:30:00Z"
 }
 ```

@@ -6,7 +6,6 @@ const nextConfig = {
     parallelServerBuildTraces: false,
     serverComponentsExternalPackages: [
       'bcryptjs',
-      'otplib',
       'qrcode',
       'ua-parser-js',
       'uuid',

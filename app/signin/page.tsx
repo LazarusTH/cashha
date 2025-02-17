@@ -11,84 +11,68 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { signIn } from "@/lib/supabase/client";
 import { useFormValidation } from "@/lib/hooks/use-form-validation";
 import { toast } from "@/components/ui/use-toast";
+import { useSearchParams } from "next/navigation";
+import { useToast } from "@/components/ui/use-toast";
+import { supabase } from "@/lib/supabase/client";
 
 export default function SignIn() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [showTwoFactor, setShowTwoFactor] = useState(false);
-  const [twoFactorCode, setTwoFactorCode] = useState("");
+  const { errors, validateEmail, validatePassword, clearErrors } = useFormValidation();
   const router = useRouter();
-  const { errors, validateEmail, validatePassword, validateTwoFactorCode, clearErrors } = useFormValidation();
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get("callbackUrl") || "/dashboard";
+  const { toast: toastHook } = useToast();
 
-  const handleSubmit = async (e: { preventDefault: () => void; }) => {
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     clearErrors();
 
     const isEmailValid = validateEmail(email);
     const isPasswordValid = validatePassword(password);
-    
     if (!isEmailValid || !isPasswordValid) return;
-    
-    if (showTwoFactor) {
-      const isTwoFactorValid = validateTwoFactorCode(twoFactorCode);
-      if (!isTwoFactorValid) return;
-    }
-    
-    setLoading(true);
+
     try {
-      if (!showTwoFactor) {
-        const response = await fetch("/api/auth/check-2fa", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email }),
-        });
-        
-        const twoFactorData = await response.json();
-        
-        if (twoFactorData.required) {
-          setShowTwoFactor(true);
-          setLoading(false);
+      setLoading(true);
+
+      const signInResponse = await signIn("credentials", {
+        email,
+        password,
+        redirect: false,
+      });
+
+      if (signInResponse?.error) {
+        if (signInResponse.error === "Email not verified") {
+          router.push("/verify-email");
           return;
         }
+        throw new Error(signInResponse.error);
       }
 
-      const { data, error } = await signIn(email, password);
-      
-      if (error) throw error;
-      
-      if (data?.user?.id) {
-        await fetch("/api/auth/log-login", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            userId: data.user.id,
-            email,
-            ip: window.navigator.userAgent,
-            timestamp: new Date().toISOString(),
-          }),
-        });
-      }
+      // Get user role and redirect accordingly
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("User not found");
 
-      toast({ title: "Success", description: "Successfully signed in!" });
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
 
-      if (!data || !data.user) throw new Error("No user data received after sign in");
+      if (!profile) throw new Error("Profile not found");
 
-      const role = data.user.user_metadata?.role || "user";
-      const isVerified = data.user.email_confirmed_at != null;
-
-      if (!isVerified) {
-        router.push("/verify-email");
-      } else if (role === "admin") {
-        router.push("/admin/dashboard");
+      // Redirect based on role
+      if (profile.role === 'admin') {
+        router.push('/admin/dashboard');
       } else {
-        router.push("/user/dashboard");
+        router.push('/dashboard');
       }
-    } catch (error) {
-      console.error("Sign in error:", error);
-      toast({
+      
+    } catch (error: any) {
+      toastHook({
         title: "Error",
-        description: error instanceof Error ? error.message : "Invalid email or password",
+        description: error.message || "Something went wrong",
         variant: "destructive",
       });
     } finally {
@@ -104,25 +88,18 @@ export default function SignIn() {
             <CardTitle className="text-2xl font-bold text-center">Login to Cashora</CardTitle>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={onSubmit}>
               <div className="grid w-full items-center gap-4">
                 <div className="flex flex-col space-y-1.5">
                   <Label htmlFor="email">Email</Label>
-                  <Input id="email" type="email" placeholder="Enter your email" value={email} onChange={(e) => setEmail(e.target.value)} disabled={loading || showTwoFactor} />
+                  <Input id="email" type="email" placeholder="Enter your email" value={email} onChange={(e) => setEmail(e.target.value)} disabled={loading} />
                   {errors.email && <p className="text-sm text-red-500">{errors.email}</p>}
                 </div>
                 <div className="flex flex-col space-y-1.5">
                   <Label htmlFor="password">Password</Label>
-                  <Input id="password" type="password" placeholder="Enter your password" value={password} onChange={(e) => setPassword(e.target.value)} disabled={loading || showTwoFactor} />
+                  <Input id="password" type="password" placeholder="Enter your password" value={password} onChange={(e) => setPassword(e.target.value)} disabled={loading} />
                   {errors.password && <p className="text-sm text-red-500">{errors.password}</p>}
                 </div>
-                {showTwoFactor && (
-                  <div className="flex flex-col space-y-1.5">
-                    <Label htmlFor="twoFactorCode">Two-Factor Code</Label>
-                    <Input id="twoFactorCode" type="text" placeholder="Enter 2FA code" value={twoFactorCode} onChange={(e) => setTwoFactorCode(e.target.value)} disabled={loading} />
-                    {errors.twoFactorCode && <p className="text-sm text-red-500">{errors.twoFactorCode}</p>}
-                  </div>
-                )}
                 <Button type="submit" disabled={loading}>{loading ? "Signing in..." : "Sign In"}</Button>
               </div>
             </form>

@@ -1,7 +1,15 @@
 import { useState } from 'react'
 
 export type ValidationErrors = {
-  [key: string]: string
+  email?: string;
+  password?: string;
+  name?: string;
+  amount?: string;
+  bankName?: string;
+  accountNumber?: string;
+  accountName?: string;
+  recipientId?: string;
+  message?: string;
 }
 
 export function useFormValidation() {
@@ -12,12 +20,11 @@ export function useFormValidation() {
       setErrors(prev => ({ ...prev, email: 'Email is required' }))
       return false
     }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(email)) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       setErrors(prev => ({ ...prev, email: 'Invalid email format' }))
       return false
     }
-    setErrors(prev => ({ ...prev, email: '' }))
+    setErrors(prev => ({ ...prev, email: undefined }))
     return true
   }
 
@@ -26,11 +33,11 @@ export function useFormValidation() {
       setErrors(prev => ({ ...prev, password: 'Password is required' }))
       return false
     }
-    if (password.length < 6) {
-      setErrors(prev => ({ ...prev, password: 'Password must be at least 6 characters' }))
+    if (password.length < 8) {
+      setErrors(prev => ({ ...prev, password: 'Password must be at least 8 characters' }))
       return false
     }
-    setErrors(prev => ({ ...prev, password: '' }))
+    setErrors(prev => ({ ...prev, password: undefined }))
     return true
   }
 
@@ -43,20 +50,7 @@ export function useFormValidation() {
       setErrors(prev => ({ ...prev, [field]: `${field} must be at least 2 characters` }))
       return false
     }
-    setErrors(prev => ({ ...prev, [field]: '' }))
-    return true
-  }
-
-  const validateTwoFactorCode = (code: string): boolean => {
-    if (!code) {
-      setErrors(prev => ({ ...prev, twoFactorCode: 'Two-factor code is required' }))
-      return false
-    }
-    if (!/^\d{6}$/.test(code)) {
-      setErrors(prev => ({ ...prev, twoFactorCode: 'Two-factor code must be 6 digits' }))
-      return false
-    }
-    setErrors(prev => ({ ...prev, twoFactorCode: '' }))
+    setErrors(prev => ({ ...prev, [field]: undefined }))
     return true
   }
 
@@ -69,7 +63,7 @@ export function useFormValidation() {
       setErrors(prev => ({ ...prev, address: 'Address must be at least 5 characters' }))
       return false
     }
-    setErrors(prev => ({ ...prev, address: '' }))
+    setErrors(prev => ({ ...prev, address: undefined }))
     return true
   }
 
@@ -82,7 +76,6 @@ export function useFormValidation() {
     validateEmail,
     validatePassword,
     validateName,
-    validateTwoFactorCode,
     validateAddress,
     clearErrors,
   }

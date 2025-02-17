@@ -19,6 +19,17 @@ export async function GET(req: Request) {
       return new NextResponse(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
     }
 
+    // Get recent security events
+    const { data: securityEvents, error: eventsError } = await supabase
+      .from('activity_logs')
+      .select('*')
+      .eq('user_id', user.id)
+      .in('action', ['LOGIN_ATTEMPT', 'PASSWORD_CHANGE', 'SECURITY_UPDATE'])
+      .order('created_at', { ascending: false })
+      .limit(10)
+
+    if (eventsError) throw eventsError
+
     // Get user's security settings
     const { data: settings, error } = await supabase
       .from('user_account_settings')
@@ -28,24 +39,16 @@ export async function GET(req: Request) {
 
     if (error && error.code !== 'PGRST116') throw error
 
-    // Get recent security events
-    const { data: securityEvents, error: eventsError } = await supabase
-      .from('activity_logs')
-      .select('*')
-      .eq('user_id', user.id)
-      .in('action', ['LOGIN_ATTEMPT', 'PASSWORD_CHANGE', '2FA_SETUP', 'SECURITY_UPDATE'])
-      .order('created_at', { ascending: false })
-      .limit(10)
-
-    if (eventsError) throw eventsError
+    const securitySettings = settings || {
+      email_notifications: true,
+      sms_notifications: false,
+      login_alerts: true,
+      transaction_alerts: true,
+    };
 
     return NextResponse.json({
-      settings: settings || {
-        require_2fa: false,
-        last_security_review: null
-      },
-      securityEvents,
-      factors: await supabase.auth.mfa.listFactors()
+      events: securityEvents,
+      settings: securitySettings,
     })
   } catch (error: any) {
     console.error('Security settings fetch error:', error)
@@ -79,26 +82,6 @@ export async function PUT(req: Request) {
       })
 
     if (settingsError) throw settingsError
-
-    // If enabling 2FA, start setup
-    if (updates.require_2fa) {
-      const { data: factorData, error: factorError } = await supabase.auth.mfa.enroll({
-        factorType: 'totp'
-      })
-
-      if (factorError) throw factorError
-
-      // Log action
-      await logAdminAction(user.id, 'SECURITY_UPDATE', {
-        type: '2FA_SETUP',
-        timestamp: new Date().toISOString()
-      })
-
-      return NextResponse.json({
-        message: 'Security settings updated',
-        factorData
-      })
-    }
 
     // Log action
     await logAdminAction(user.id, 'SECURITY_UPDATE', {

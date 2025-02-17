@@ -18,22 +18,21 @@ describe('Account Management API', () => {
 
   beforeEach(() => {
     mockSupabase = {
-      from: jest.fn().mockReturnThis(),
-      select: jest.fn().mockReturnThis(),
-      update: jest.fn().mockReturnThis(),
-      upsert: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockReturnThis(),
-      single: jest.fn().mockReturnThis(),
-      or: jest.fn().mockReturnThis(),
-      in: jest.fn().mockReturnThis(),
       auth: {
         getUser: jest.fn(),
-        signOut: jest.fn(),
-        mfa: {
-          enroll: jest.fn(),
-          listFactors: jest.fn()
-        }
-      }
+        getSession: jest.fn(),
+      },
+      from: jest.fn(() => ({
+        select: jest.fn(() => ({
+          eq: jest.fn(() => ({
+            single: jest.fn(),
+          })),
+        })),
+        update: jest.fn(() => ({
+          eq: jest.fn(),
+        })),
+        insert: jest.fn(),
+      })),
     }
     ;(createRouteHandlerClient as jest.Mock).mockReturnValue(mockSupabase)
   })
@@ -46,10 +45,10 @@ describe('Account Management API', () => {
       })
 
       // Mock no pending transactions
-      mockSupabase.single.mockResolvedValue({ data: null })
+      mockSupabase.from().select().eq().single.mockResolvedValue({ data: null })
 
       // Mock profile update
-      mockSupabase.update.mockResolvedValue({ data: null })
+      mockSupabase.from().update().eq.mockResolvedValue({ data: null })
 
       const response = await fetch('/api/user/account/close', {
         method: 'POST',
@@ -68,7 +67,7 @@ describe('Account Management API', () => {
       })
 
       // Mock pending transaction
-      mockSupabase.single.mockResolvedValue({
+      mockSupabase.from().select().eq().single.mockResolvedValue({
         data: { id: 'tx-1' }
       })
 
@@ -91,7 +90,7 @@ describe('Account Management API', () => {
       })
 
       // Mock profile data
-      mockSupabase.single.mockResolvedValueOnce({
+      mockSupabase.from().select().eq().single.mockResolvedValueOnce({
         data: {
           id: 'user-id',
           full_name: 'Test User',
@@ -100,7 +99,7 @@ describe('Account Management API', () => {
       })
 
       // Mock transactions
-      mockSupabase.select.mockResolvedValueOnce({
+      mockSupabase.from().select().mockResolvedValueOnce({
         data: [{
           id: 'tx-1',
           amount: 1000,
@@ -118,80 +117,55 @@ describe('Account Management API', () => {
     })
   })
 
-  describe('GET /api/user/account/security', () => {
-    it('should fetch security settings and events', async () => {
-      // Mock authenticated user
-      mockSupabase.auth.getUser.mockResolvedValue({
-        data: { user: { id: 'user-id' } }
-      })
+  describe('GET /api/user/account/settings', () => {
+    it('should return user account settings', async () => {
+      const mockUser = {
+        id: 'user-123',
+        email: 'test@example.com',
+      };
 
-      // Mock security settings
-      mockSupabase.single.mockResolvedValue({
+      mockSupabase.auth.getUser.mockResolvedValue({ data: { user: mockUser } });
+      mockSupabase.from().select().eq().single.mockResolvedValue({
         data: {
-          require_2fa: true,
-          last_security_review: '2025-02-07T00:00:00Z'
-        }
-      })
+          email_notifications: true,
+          sms_notifications: false,
+          login_alerts: true,
+        },
+      });
 
-      // Mock security events
-      mockSupabase.select.mockResolvedValue({
-        data: [{
-          action: 'LOGIN_ATTEMPT',
-          details: { success: true }
-        }]
-      })
+      const response = await fetch('/api/user/account/settings');
+      const data = await response.json();
 
-      // Mock 2FA factors
-      mockSupabase.auth.mfa.listFactors.mockResolvedValue({
-        data: {
-          totp: [{ id: 'factor-1', status: 'enabled' }]
-        }
-      })
+      expect(response.status).toBe(200);
+      expect(data.settings).toBeDefined();
+      expect(data.settings.email_notifications).toBe(true);
+    });
+  });
 
-      const response = await fetch('/api/user/account/security')
-      expect(response.status).toBe(200)
-      const data = await response.json()
-      expect(data.settings.require_2fa).toBe(true)
-      expect(data.securityEvents).toHaveLength(1)
-      expect(data.factors).toBeDefined()
-    })
-  })
+  describe('PUT /api/user/account/settings', () => {
+    it('should update account settings', async () => {
+      const mockUser = {
+        id: 'user-123',
+        email: 'test@example.com',
+      };
 
-  describe('PUT /api/user/account/security', () => {
-    it('should update security settings and setup 2FA', async () => {
-      // Mock authenticated user
-      mockSupabase.auth.getUser.mockResolvedValue({
-        data: { user: { id: 'user-id' } }
-      })
+      const updates = {
+        email_notifications: false,
+        sms_notifications: true,
+        login_alerts: false,
+      };
 
-      // Mock settings update
-      mockSupabase.upsert.mockResolvedValue({
-        data: {
-          require_2fa: true,
-          last_security_review: expect.any(String)
-        }
-      })
+      mockSupabase.auth.getUser.mockResolvedValue({ data: { user: mockUser } });
+      mockSupabase.from().update().eq.mockResolvedValue({ data: null, error: null });
 
-      // Mock 2FA enrollment
-      mockSupabase.auth.mfa.enroll.mockResolvedValue({
-        data: {
-          qr: 'qr-code-data',
-          secret: 'totp-secret'
-        }
-      })
-
-      const response = await fetch('/api/user/account/security', {
+      const response = await fetch('/api/user/account/settings', {
         method: 'PUT',
-        body: JSON.stringify({
-          require_2fa: true,
-          daily_transfer_limit: 10000
-        })
-      })
+        body: JSON.stringify({ settings: updates }),
+      });
 
-      expect(response.status).toBe(200)
-      const data = await response.json()
-      expect(data.message).toBe('Security settings updated')
-      expect(data.factorData).toBeDefined()
-    })
-  })
+      expect(response.status).toBe(200);
+      const data = await response.json();
+      expect(data.message).toBe('Settings updated successfully');
+    });
+  });
 })

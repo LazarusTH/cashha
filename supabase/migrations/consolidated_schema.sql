@@ -11,8 +11,6 @@ CREATE TABLE profiles (
     email TEXT NOT NULL,
     full_name TEXT,
     role TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('admin', 'user')),
-    two_factor_enabled BOOLEAN DEFAULT false,
-    two_factor_secret TEXT,
     email_notifications BOOLEAN DEFAULT true,
     login_alerts BOOLEAN DEFAULT true,
     transaction_alerts BOOLEAN DEFAULT true,

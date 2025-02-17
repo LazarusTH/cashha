@@ -5,37 +5,37 @@ import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 
 export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url)
-  const token = searchParams.get('token')
-  const type = searchParams.get('type')
-
-  if (!token || type !== 'email_verification') {
-    return NextResponse.json({ 
-      error: 'Invalid verification link' 
-    }, {
-      status: 400
-    })
-  }
-
   try {
+    const requestUrl = new URL(req.url)
+    const token = requestUrl.searchParams.get('token')
+
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Verification token is required' },
+        { status: 400 }
+      )
+    }
+
     const supabase = createRouteHandlerClient({ cookies })
-    
-    const { error } = await supabase.auth.verifyOtp({
-      token_hash: token,
-      type: 'email'
-    })
 
-    if (error) throw error
+    const { error } = await supabase.auth.verifyEmailChange(token)
 
-    return NextResponse.json({
-      message: 'Email verified successfully'
-    })
-  } catch (error: any) {
-    console.error('Email verification error:', error)
-    return NextResponse.json({ 
-      error: error.message || 'Failed to verify email' 
-    }, {
-      status: 400
-    })
+    if (error) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: 400 }
+      )
+    }
+
+    return NextResponse.json(
+      { message: 'Email verified successfully' },
+      { status: 200 }
+    )
+  } catch (error) {
+    console.error('Error verifying email:', error)
+    return NextResponse.json(
+      { error: 'Failed to verify email' },
+      { status: 500 }
+    )
   }
 }

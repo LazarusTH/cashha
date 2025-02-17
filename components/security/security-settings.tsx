@@ -7,91 +7,50 @@ import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/components/ui/use-toast'
 import { Icons } from '@/components/ui/icons'
-import TwoFactorDialog from './two-factor-dialog'
 import SecurityQuestionsDialog from './security-questions-dialog'
 import { DeviceHistory } from './device-history'
 
-interface SecuritySettingsProps {
-  profile: {
-    two_factor_enabled: boolean
-    email_notifications: boolean
-    login_alerts: boolean
-    transaction_alerts: boolean
-  }
+interface UserProfile {
+  id: string
+  full_name: string
+  email: string
+  phone_number: string
+  email_verified: boolean
+  phone_verified: boolean
 }
 
-export function SecuritySettings({ profile }: SecuritySettingsProps) {
-  const [twoFactorEnabled, setTwoFactorEnabled] = useState(profile.two_factor_enabled)
-  const [emailNotifications, setEmailNotifications] = useState(profile.email_notifications)
-  const [loginAlerts, setLoginAlerts] = useState(profile.login_alerts)
-  const [transactionAlerts, setTransactionAlerts] = useState(profile.transaction_alerts)
-  const [showTwoFactorDialog, setShowTwoFactorDialog] = useState(false)
-  const [showSecurityQuestionsDialog, setShowSecurityQuestionsDialog] = useState(false)
-  const [loading, setLoading] = useState(false)
+export function SecuritySettings({ profile }: { profile: UserProfile }) {
+  const [emailNotifications, setEmailNotifications] = useState(true)
+  const [loginAlerts, setLoginAlerts] = useState(true)
+  const [transactionAlerts, setTransactionAlerts] = useState(true)
   const { toast } = useToast()
 
-  const handleDisable2FA = async () => {
+  const handleUpdateSettings = async (setting: string, value: boolean) => {
     try {
-      setLoading(true)
-      const response = await fetch('/api/auth/disable-2fa', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: '' }) // Token will be requested in the UI
+      const response = await fetch('/api/user/account/security', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          [setting]: value,
+        }),
       })
-      const data = await response.json()
-      if (!response.ok) throw new Error(data.error)
-      
-      setTwoFactorEnabled(false)
-      toast({
-        title: 'Success',
-        description: 'Two-factor authentication has been disabled.',
-      })
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to disable 2FA. Please try again.',
-        variant: 'destructive'
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
 
-  const handleNotificationChange = async (type: string, value: boolean) => {
-    try {
-      setLoading(true)
-      const response = await fetch('/api/user/notifications', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type, enabled: value })
-      })
-      const data = await response.json()
-      if (!response.ok) throw new Error(data.error)
-
-      switch (type) {
-        case 'email':
-          setEmailNotifications(value)
-          break
-        case 'login':
-          setLoginAlerts(value)
-          break
-        case 'transaction':
-          setTransactionAlerts(value)
-          break
+      if (!response.ok) {
+        throw new Error('Failed to update settings')
       }
 
       toast({
         title: 'Success',
-        description: 'Notification settings updated.',
+        description: 'Security settings updated successfully.',
       })
     } catch (error) {
       toast({
         title: 'Error',
-        description: 'Failed to update notification settings.',
-        variant: 'destructive'
+        description: 'Failed to update settings. Please try again.',
+        variant: 'destructive',
       })
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -108,76 +67,48 @@ export function SecuritySettings({ profile }: SecuritySettingsProps) {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
-                <Label>Two-Factor Authentication</Label>
+                <Label>Email Notifications</Label>
                 <p className="text-sm text-muted-foreground">
-                  Add an extra layer of security to your account.
+                  Receive notifications about important account activity
                 </p>
               </div>
-              {twoFactorEnabled ? (
-                <Button
-                  variant="destructive"
-                  onClick={handleDisable2FA}
-                  disabled={loading}
-                >
-                  {loading && <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />}
-                  Disable
-                </Button>
-              ) : (
-                <Button
-                  variant="default"
-                  onClick={() => setShowTwoFactorDialog(true)}
-                  disabled={loading}
-                >
-                  Enable
-                </Button>
-              )}
+              <Switch
+                checked={emailNotifications}
+                onCheckedChange={(checked) => {
+                  setEmailNotifications(checked)
+                  handleUpdateSettings('email_notifications', checked)
+                }}
+              />
             </div>
-
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
-                <Label>Security Questions</Label>
+                <Label>Login Alerts</Label>
                 <p className="text-sm text-muted-foreground">
-                  Set up questions to help verify your identity.
+                  Get notified about new sign-ins to your account
                 </p>
               </div>
-              <Button
-                variant="outline"
-                onClick={() => setShowSecurityQuestionsDialog(true)}
-              >
-                Manage
-              </Button>
+              <Switch
+                checked={loginAlerts}
+                onCheckedChange={(checked) => {
+                  setLoginAlerts(checked)
+                  handleUpdateSettings('login_alerts', checked)
+                }}
+              />
             </div>
-
-            <div className="space-y-4">
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="email-notifications"
-                  checked={emailNotifications}
-                  onCheckedChange={(checked) => handleNotificationChange('email', checked)}
-                  disabled={loading}
-                />
-                <Label htmlFor="email-notifications">Email Notifications</Label>
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label>Transaction Alerts</Label>
+                <p className="text-sm text-muted-foreground">
+                  Receive notifications for all transactions
+                </p>
               </div>
-
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="login-alerts"
-                  checked={loginAlerts}
-                  onCheckedChange={(checked) => handleNotificationChange('login', checked)}
-                  disabled={loading}
-                />
-                <Label htmlFor="login-alerts">Login Alerts</Label>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="transaction-alerts"
-                  checked={transactionAlerts}
-                  onCheckedChange={(checked) => handleNotificationChange('transaction', checked)}
-                  disabled={loading}
-                />
-                <Label htmlFor="transaction-alerts">Transaction Alerts</Label>
-              </div>
+              <Switch
+                checked={transactionAlerts}
+                onCheckedChange={(checked) => {
+                  setTransactionAlerts(checked)
+                  handleUpdateSettings('transaction_alerts', checked)
+                }}
+              />
             </div>
           </div>
         </CardContent>
@@ -185,15 +116,9 @@ export function SecuritySettings({ profile }: SecuritySettingsProps) {
 
       <DeviceHistory />
 
-      <TwoFactorDialog
-        open={showTwoFactorDialog}
-        onClose={() => setShowTwoFactorDialog(false)}
-        onSuccess={() => setTwoFactorEnabled(true)}
-      />
-
       <SecurityQuestionsDialog
-        open={showSecurityQuestionsDialog}
-        onClose={() => setShowSecurityQuestionsDialog(false)}
+        open={false}
+        onClose={() => {}}
         onSuccess={() => {
           toast({
             title: 'Success',

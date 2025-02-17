@@ -3,7 +3,6 @@ export interface UserAccountSettings {
   user_id: string;
   daily_transfer_limit: number;
   monthly_transfer_limit: number;
-  require_2fa: boolean;
   last_security_review?: string;
   account_closure_reason?: string;
   account_closure_date?: string;
@@ -12,14 +11,12 @@ export interface UserAccountSettings {
 }
 
 export interface SecuritySettings {
-  settings: UserAccountSettings;
-  securityEvents: ActivityLog[];
-  factors: {
-    totp?: {
-      id: string;
-      status: 'enabled' | 'disabled';
-    };
-  };
+  email_notifications: boolean;
+  sms_notifications: boolean;
+  login_alerts: boolean;
+  transaction_alerts: boolean;
+  marketing_emails: boolean;
+  account_updates: boolean;
 }
 
 export interface AccountExportData {
@@ -51,4 +48,18 @@ export interface AccountExportData {
   };
   settings?: UserAccountSettings;
   exportDate: string;
+}
+
+export interface AccountSettings {
+  security: SecuritySettings;
+  notifications: {
+    email: boolean;
+    push: boolean;
+    sms: boolean;
+  };
+  preferences: {
+    language: string;
+    currency: string;
+    timezone: string;
+  };
 }

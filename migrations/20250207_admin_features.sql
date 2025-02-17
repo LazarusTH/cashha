@@ -24,15 +24,29 @@ CREATE TABLE IF NOT EXISTS email_receipts (
 -- Create admin settings table
 CREATE TABLE IF NOT EXISTS admin_settings (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    min_withdrawal_amount DECIMAL(10,2) NOT NULL DEFAULT 10.00,
-    max_withdrawal_amount DECIMAL(10,2) NOT NULL DEFAULT 10000.00,
-    min_deposit_amount DECIMAL(10,2) NOT NULL DEFAULT 10.00,
-    max_deposit_amount DECIMAL(10,2) NOT NULL DEFAULT 10000.00,
-    transaction_fee_percentage DECIMAL(5,2) NOT NULL DEFAULT 2.50,
-    support_email VARCHAR(255) NOT NULL DEFAULT 'support@cashora.com',
-    maintenance_mode BOOLEAN NOT NULL DEFAULT false,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    setting_name VARCHAR(100) NOT NULL UNIQUE,
+    setting_value JSONB NOT NULL,
+    description TEXT,
+    category VARCHAR(50) NOT NULL,
+    is_enabled BOOLEAN NOT NULL DEFAULT true,
+    requires_restart BOOLEAN NOT NULL DEFAULT false,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID REFERENCES auth.users(id),
+    updated_by UUID REFERENCES auth.users(id)
+);
+
+-- Create admin audit logs table
+CREATE TABLE IF NOT EXISTS admin_audit_logs (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    admin_id UUID NOT NULL REFERENCES auth.users(id),
+    action VARCHAR(100) NOT NULL,
+    resource_type VARCHAR(50) NOT NULL,
+    resource_id UUID,
+    details JSONB,
+    ip_address VARCHAR(45),
+    user_agent TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Create notification settings table
@@ -48,33 +62,20 @@ CREATE TABLE IF NOT EXISTS notification_settings (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Create security settings table
-CREATE TABLE IF NOT EXISTS security_settings (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    max_login_attempts INTEGER NOT NULL DEFAULT 5,
-    lockout_duration_minutes INTEGER NOT NULL DEFAULT 30,
-    require_2fa_for_withdrawals BOOLEAN NOT NULL DEFAULT true,
-    minimum_password_length INTEGER NOT NULL DEFAULT 8,
-    password_requires_letter BOOLEAN NOT NULL DEFAULT true,
-    password_requires_number BOOLEAN NOT NULL DEFAULT true,
-    password_requires_special_char BOOLEAN NOT NULL DEFAULT true,
-    session_timeout_minutes INTEGER NOT NULL DEFAULT 60,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
 -- Create indexes for better query performance
 CREATE INDEX IF NOT EXISTS idx_email_receipts_user_id ON email_receipts(user_id);
 CREATE INDEX IF NOT EXISTS idx_email_receipts_sent_at ON email_receipts(sent_at);
 CREATE INDEX IF NOT EXISTS idx_email_templates_name ON email_templates(name);
 CREATE INDEX IF NOT EXISTS idx_notification_settings_user_id ON notification_settings(user_id);
+CREATE INDEX IF NOT EXISTS idx_admin_settings_name ON admin_settings(setting_name);
+CREATE INDEX IF NOT EXISTS idx_admin_settings_category ON admin_settings(category);
+CREATE INDEX IF NOT EXISTS idx_admin_audit_logs_admin ON admin_audit_logs(admin_id);
+CREATE INDEX IF NOT EXISTS idx_admin_audit_logs_action ON admin_audit_logs(action);
+CREATE INDEX IF NOT EXISTS idx_admin_audit_logs_resource ON admin_audit_logs(resource_type, resource_id);
+CREATE INDEX IF NOT EXISTS idx_admin_audit_logs_created ON admin_audit_logs(created_at);
 
 -- Insert default admin settings
 INSERT INTO admin_settings (id) VALUES (uuid_generate_v4())
-ON CONFLICT DO NOTHING;
-
--- Insert default security settings
-INSERT INTO security_settings (id) VALUES (uuid_generate_v4())
 ON CONFLICT DO NOTHING;
 
 -- Add triggers for updated_at columns

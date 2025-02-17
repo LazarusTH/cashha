@@ -9,8 +9,6 @@ const supabase = createClient<Database>(supabaseUrl, supabaseServiceKey);
 export type SecurityEventType =
   | "NEW_LOGIN"
   | "FAILED_LOGIN"
-  | "2FA_ENABLED"
-  | "2FA_DISABLED"
   | "PASSWORD_CHANGED"
   | "SECURITY_QUESTIONS_UPDATED"
   | "DEVICE_REMOVED"
@@ -52,24 +50,6 @@ const templates: Record<SecurityEventType, (data: any) => EmailData> = {
         <li>Attempts: ${data.attempts}</li>
       </ul>
       <p>If this wasn't you, your account might be under attack. Please review your security settings.</p>
-    `,
-  }),
-  "2FA_ENABLED": (data) => ({
-    to: data.email,
-    subject: "Two-Factor Authentication Enabled",
-    html: `
-      <h2>2FA Has Been Enabled</h2>
-      <p>Two-factor authentication has been enabled for your account.</p>
-      <p>Your account is now more secure!</p>
-    `,
-  }),
-  "2FA_DISABLED": (data) => ({
-    to: data.email,
-    subject: "Two-Factor Authentication Disabled",
-    html: `
-      <h2>2FA Has Been Disabled</h2>
-      <p>Two-factor authentication has been disabled for your account.</p>
-      <p>Your account is now less secure. We recommend enabling 2FA for better security.</p>
     `,
   }),
   PASSWORD_CHANGED: (data) => ({

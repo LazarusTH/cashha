@@ -17,13 +17,15 @@ interface AuthContextType {
   resetPassword: (email: string) => Promise<void>
   updatePassword: (password: string) => Promise<void>
   updateEmail: (email: string) => Promise<void>
-  verifyEmail: (token: string) => Promise<void>
   refreshSession: () => Promise<void>
   updateProfile: (profile: Partial<UserProfile>) => Promise<void>
   deleteAccount: () => Promise<void>
   isEmailVerified: boolean
   role: 'admin' | 'user' | null
   lastActive: Date | null
+  isAdmin: () => boolean
+  hasPermission: (permission: string) => boolean
+  permissions: string[]
 }
 
 interface UserData {
@@ -54,13 +56,15 @@ const AuthContext = createContext<AuthContextType>({
   resetPassword: async () => {},
   updatePassword: async () => {},
   updateEmail: async () => {},
-  verifyEmail: async () => {},
   refreshSession: async () => {},
   updateProfile: async () => {},
   deleteAccount: async () => {},
   isEmailVerified: false,
   role: null,
   lastActive: null,
+  isAdmin: () => false,
+  hasPermission: () => false,
+  permissions: []
 })
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -71,6 +75,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isEmailVerified, setIsEmailVerified] = useState(false)
   const [role, setRole] = useState<'admin' | 'user' | null>(null)
   const [lastActive, setLastActive] = useState<Date | null>(null)
+  const [permissions, setPermissions] = useState<string[]>([])
   const router = useRouter()
 
   const supabase = createBrowserClient<Database>(
@@ -79,35 +84,70 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   )
 
   useEffect(() => {
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const initializeAuth = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession()
+        if (error) throw error
+
+        if (session?.user) {
+          setUser(session.user)
+          setIsEmailVerified(session.user.email_confirmed_at != null)
+
+          // Fetch user profile and permissions
+          const { data: profileData, error: profileError } = await supabase
+            .from('profiles')
+            .select('*, roles(permissions)')
+            .eq('id', session.user.id)
+            .single()
+
+          if (profileError) throw profileError
+
+          setProfile(profileData)
+          setRole(profileData.role)
+          setPermissions(profileData.roles?.permissions || [])
+          setLastActive(new Date())
+        }
+      } catch (error) {
+        console.error('Error initializing auth:', error)
+        setError(error instanceof Error ? error : new Error('Failed to initialize auth'))
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    initializeAuth()
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
         setUser(session.user)
-        const { data: profile } = await supabase
+        setIsEmailVerified(session.user.email_confirmed_at != null)
+
+        // Fetch user profile and permissions on auth state change
+        const { data: profileData, error: profileError } = await supabase
           .from('profiles')
-          .select('*')
+          .select('*, roles(permissions)')
           .eq('id', session.user.id)
           .single()
-        setProfile(profile)
-        setIsEmailVerified(profile.email_confirmed_at != null)
-        setRole(profile.role)
-        setLastActive(profile.last_active ? new Date(profile.last_active) : null)
+
+        if (!profileError && profileData) {
+          setProfile(profileData)
+          setRole(profileData.role)
+          setPermissions(profileData.roles?.permissions || [])
+          setLastActive(new Date())
+        }
       } else {
         setUser(null)
         setProfile(null)
-        setIsEmailVerified(false)
         setRole(null)
+        setPermissions([])
         setLastActive(null)
       }
-      setLoading(false)
-      router.refresh()
     })
 
     return () => {
       subscription.unsubscribe()
     }
-  }, [supabase, router])
+  }, [supabase])
 
   const signIn = async (email: string, password: string) => {
     try {
@@ -294,29 +334,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const verifyEmail = async (token: string) => {
+  const verifyEmail = async (email: string, token: string) => {
     try {
-      const { error } = await supabase.auth.verifyOtp({
-        token_hash: token,
-        type: 'email',
-      })
-      if (error) throw error
+      setLoading(true);
+      const { error } = await supabase.auth.verifyEmailChange(token);
       
-      setIsEmailVerified(true)
-      toast({
-        title: "Success",
-        description: "Email verified successfully",
-      })
+      if (error) throw error;
+      
+      return { error: null };
     } catch (error) {
-      console.error('Error verifying email:', error)
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to verify email",
-        variant: "destructive",
-      })
-      throw error
+      return { error };
+    } finally {
+      setLoading(false);
     }
-  }
+  };
 
   const refreshSession = async () => {
     try {
@@ -393,6 +424,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  const isAdmin = () => role === 'admin'
+
+  const hasPermission = (permission: string) => {
+    return permissions.includes(permission)
+  }
+
   return (
     <AuthContext.Provider
       value={{
@@ -413,6 +450,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isEmailVerified,
         role,
         lastActive,
+        isAdmin,
+        hasPermission,
+        permissions
       }}
     >
       {children}
