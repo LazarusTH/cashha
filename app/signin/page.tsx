@@ -49,7 +49,8 @@ export default function SignIn() {
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ email }),
+          body: JSON.stringify({ email })
+        })
         }); const twoFactorData = await response.json();
 
         if (twoFactorData.required) {
@@ -63,18 +64,7 @@ export default function SignIn() {
       const { data, error } = await signIn(email, password)
       
       if (error) {
-          toast({
-            title: "Error",
-            description: error instanceof Error ? error.message : "Invalid email or password",
-            variant: "destructive",
-          })
         throw error
-      }
-
-      // Reset login attempts on successful login
-      setLoginAttempts(0)
-      setIsBlocked(false)
-      setBlockExpiry(null)
 
       // Log the successful login
       if (data?.user?.id) {
@@ -120,8 +110,8 @@ export default function SignIn() {
         variant: "destructive",
       })
     }
-      finally { setLoading(false)}
-    };
+    finally { setLoading(false) }
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-r from-blue-400 to-purple-500">
@@ -175,11 +165,9 @@ export default function SignIn() {
                   </div>
                 )}
 
-                <Button 
-                  type="submit" disabled={loading}
-                >
+                <Button type="submit" disabled={loading}>
                   {loading ? "Signing in..." : "Sign In"}
-                )}
+                </Button>
               </div>
             </form>
           </CardContent>
@@ -201,4 +189,3 @@ export default function SignIn() {
     </div>
   )
 }
-
