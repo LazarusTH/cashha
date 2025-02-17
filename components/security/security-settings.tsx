@@ -7,8 +7,8 @@ import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/components/ui/use-toast'
 import { Icons } from '@/components/ui/icons'
-import { TwoFactorDialog } from './two-factor-dialog'
-import { SecurityQuestionsDialog } from './security-questions-dialog'
+import TwoFactorDialog from './two-factor-dialog'
+import SecurityQuestionsDialog from './security-questions-dialog'
 import { DeviceHistory } from './device-history'
 
 interface SecuritySettingsProps {
