@@ -4,21 +4,18 @@ import { NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(request: Request) {
-  const requestUrl = new URL(request.url);
-  const userId = requestUrl.searchParams.get('userId');
-
-  if (!userId) {
-    return new NextResponse(JSON.stringify({ error: 'userId is required' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
-
-  const cookieStore = cookies();
-  const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
-
+export async function GET(request: { url: string | URL; }) {
   try {
+    const requestUrl = new URL(request.url);
+    const userId = requestUrl.searchParams.get('userId');
+
+    if (!userId) {
+      return NextResponse.json({ error: 'userId is required' }, { status: 400 });
+    }
+
+    const cookieStore = cookies();
+    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+
     const { data, error } = await supabase
       .from('users')
       .select('two_factor_enabled')
@@ -26,37 +23,20 @@ export async function GET(request: Request) {
       .single();
 
     if (error) {
-        if (error.code === 'PGRST116')
-        {
-          return new NextResponse(JSON.stringify({ error: 'User not found' }), {
-            status: 404,
-            headers: { 'Content-Type': 'application/json' },
-          });
-        }
-      return new NextResponse(JSON.stringify({ error: 'Internal Server Error' }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      if (error.code === 'PGRST116') {
+        return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      }
+      console.error('Supabase error:', error);
+      return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 
     if (!data) {
-      return new NextResponse(JSON.stringify({ error: 'User not found' }), {
-        status: 404,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    return new NextResponse(
-      JSON.stringify({ twoFactorEnabled: data.two_factor_enabled }),
-      {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      }
-    );
+    return NextResponse.json({ twoFactorEnabled: data.two_factor_enabled }, { status: 200 });
   } catch (error) {
-    return new NextResponse(JSON.stringify({ error: 'Internal Server Error' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    console.error('Unexpected error:', error);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
