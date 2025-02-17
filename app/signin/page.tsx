@@ -16,54 +16,14 @@ export default function SignIn() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
-  const [loginAttempts, setLoginAttempts] = useState(0)
-  const [isBlocked, setIsBlocked] = useState(false)
-  const [blockExpiry, setBlockExpiry] = useState<Date | null>(null)
   const [showTwoFactor, setShowTwoFactor] = useState(false)
   const [twoFactorCode, setTwoFactorCode] = useState("")
   const router = useRouter()
   const { errors, validateEmail, validatePassword, validateTwoFactorCode, clearErrors } = useFormValidation()
 
-  useEffect(() => {
-    // Check if user is blocked
-    const checkBlockStatus = async () => {
-      try {
-        const response = await fetch('/api/auth/block-status', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ email }),
-        })
-        const data = await response.json()
-        
-        if (data.blocked) {
-          setIsBlocked(true)
-          setBlockExpiry(new Date(data.blockExpiry))
-        }
-      } catch (error) {
-        console.error('Error checking block status:', error)
-      }
-    }
-
-    if (email) {
-      checkBlockStatus()
-    }
-  }, [email, setIsBlocked, setBlockExpiry])
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     clearErrors()
-
-    // Check if blocked
-    if (isBlocked && blockExpiry && blockExpiry > new Date()) {
-      toast({
-        title: "Error",
-        description: `Account is temporarily blocked. Please try again after ${blockExpiry.toLocaleString()}`,
-        variant: "destructive",
-      })
-      return
-    }
 
     // Validate inputs
     const isEmailValid = validateEmail(email)
@@ -84,13 +44,13 @@ export default function SignIn() {
     try {
       // First, verify if 2FA is required
       if (!showTwoFactor) {
-        const { data: twoFactorData } = await fetch('/api/auth/check-2fa', {
+        const response = await fetch('/api/auth/check-2fa', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({ email }),
-        }).then(res => res.json())
+        }); const twoFactorData = await response.json();
 
         if (twoFactorData.required) {
           setShowTwoFactor(true)
@@ -103,30 +63,11 @@ export default function SignIn() {
       const { data, error } = await signIn(email, password)
       
       if (error) {
-        setLoginAttempts(prev => prev + 1)
-        
-        // Check if we should block the account
-        if (loginAttempts + 1 >= 5) {
-          const blockDuration = 30 * 60 * 1000 // 30 minutes
-          const expiry = new Date(Date.now() + blockDuration)
-          
-          await fetch('/api/auth/block-account', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              email,
-              blockExpiry: expiry.toISOString(),
-            }),
+          toast({
+            title: "Error",
+            description: error instanceof Error ? error.message : "Invalid email or password",
+            variant: "destructive",
           })
-          
-          setIsBlocked(true)
-          setBlockExpiry(expiry)
-          
-          throw new Error(`Too many failed attempts. Account is blocked until ${expiry.toLocaleString()}`)
-        }
-        
         throw error
       }
 
@@ -178,10 +119,9 @@ export default function SignIn() {
         description: error instanceof Error ? error.message : "Invalid email or password",
         variant: "destructive",
       })
-    } finally {
-      setLoading(false)
     }
-  }
+      finally { setLoading(false)}
+    };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-r from-blue-400 to-purple-500">
@@ -236,16 +176,9 @@ export default function SignIn() {
                 )}
 
                 <Button 
-                  type="submit" 
-                  disabled={loading || (isBlocked && blockExpiry !== null && blockExpiry > new Date())}
+                  type="submit" disabled={loading}
                 >
                   {loading ? "Signing in..." : "Sign In"}
-                </Button>
-
-                {isBlocked && blockExpiry && (
-                  <p className="text-sm text-red-500 text-center">
-                    Account is blocked until {blockExpiry.toLocaleString()}
-                  </p>
                 )}
               </div>
             </form>
@@ -268,3 +201,4 @@ export default function SignIn() {
     </div>
   )
 }
+

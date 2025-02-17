@@ -10,7 +10,6 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { signUp } from "@/lib/supabase/client"
 import { createProfile } from "@/lib/supabase/profile"
-import { useFormValidation } from "@/lib/hooks/use-form-validation"
 import { useToast } from "@/components/ui/use-toast"
 import { validateFileUpload } from "@/lib/utils/validation"
 
@@ -35,14 +34,8 @@ export default function SignUp() {
     proofOfAddress?: File
   }>({})
   const router = useRouter()
-  const { 
-    errors, 
-    validateEmail, 
-    validatePassword, 
-    validateName, 
-    validateAddress,
-    clearErrors 
-  } = useFormValidation()
+
+  const [errors, setErrors] = useState<{ [key: string]: string }>({})
   const { toast } = useToast()
 
   useEffect(() => {
@@ -98,13 +91,12 @@ export default function SignUp() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     clearErrors()
-
     // Validate all inputs
-    const isEmailValid = validateEmail(formData.email)
-    const isPasswordValid = validatePassword(formData.password)
-    const isFirstNameValid = validateName(formData.firstName, 'firstName')
-    const isLastNameValid = validateName(formData.lastName, 'lastName')
-    const isAddressValid = validateAddress(formData.address)
+    const isEmailValid = validateEmail(formData.email);
+    const isPasswordValid = validatePassword(formData.password);
+    const isFirstNameValid = validateName(formData.firstName, 'firstName');
+    const isLastNameValid = validateName(formData.lastName, 'lastName');
+    const isAddressValid = validateAddress(formData.address);
 
     if (formData.password !== formData.confirmPassword) {
       toast({
@@ -124,8 +116,7 @@ export default function SignUp() {
       return
     }
 
-    if (!isEmailValid || !isPasswordValid || !isFirstNameValid || 
-        !isLastNameValid || !isAddressValid) {
+    if (!isEmailValid || !isPasswordValid || !isFirstNameValid || !isLastNameValid || !isAddressValid) {
       return
     }
 
@@ -172,7 +163,7 @@ export default function SignUp() {
       if (!data || !data.user) {
         throw new Error('Failed to create user account')
       }
-
+    
       await createProfile({
         id: data.user.id,
         email: formData.email,
@@ -258,6 +249,41 @@ export default function SignUp() {
       </div>
     )
   }
+
+  const clearErrors = () => {
+    setErrors({});
+  };
+
+  const validateEmail = (email: string): boolean => {
+    if (!email) {
+      setErrors((prev) => ({ ...prev, email: "Email is required" }));
+      return false;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setErrors((prev) => ({ ...prev, email: "Invalid email format" }));
+      return false;
+    }
+    return true;
+  };
+
+  const validatePassword = (password: string): boolean => {
+    if (!password) {
+      setErrors((prev) => ({ ...prev, password: "Password is required" }));
+      return false;
+    }
+    if (password.length < 6) {
+      setErrors((prev) => ({ ...prev, password: "Password must be at least 6 characters" }));
+      return false;
+    }
+    return true;
+  };
+  const validateName = (value: string, field: string): boolean => {
+    if (!value) {
+      setErrors((prev) => ({ ...prev, [field]: `${field} is required` }));
+      return false;
+    }
+    return true;
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-r from-blue-400 to-purple-500 py-12">
@@ -368,7 +394,7 @@ export default function SignUp() {
                     onChange={handleChange}
                     disabled={loading}
                   />
-                  {errors.password && <p className="text-sm text-red-500">{errors.password}</p>}
+                  {errors.password && <p className="text-sm text-red-500">{errors.password}</p>}{errors.password && <p className="text-sm text-red-500">{errors.password}</p>}
                 </div>
                 <div className="flex flex-col space-y-1.5">
                   <Label htmlFor="confirmPassword">Confirm Password</Label>
