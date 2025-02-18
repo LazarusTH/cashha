@@ -11,7 +11,7 @@ export async function POST(req: Request) {
     const { email, password } = await req.json()
     const supabase = createRouteHandlerClient({ cookies })
 
-    const { data, error } = await supabase.auth.signInWithPassword({
+    const { data: { user }, error } = await supabase.auth.signInWithPassword({
       email,
       password
     })
@@ -22,13 +22,21 @@ export async function POST(req: Request) {
     const { data: profile } = await supabase
       .from('profiles')
       .select('*')
-      .eq('id', data.user.id)
+      .eq('id', user.id)
       .single()
 
-    return NextResponse.json({
-      user: data.user,
-      profile
-    })
+    if (!profile) {
+      return new NextResponse(JSON.stringify({ error: 'User not found in profiles' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    if (profile.role === 'admin') {
+      return NextResponse.redirect(new URL('/admin', req.url))
+    } else {
+      return NextResponse.redirect(new URL('/user', req.url))
+    }
   } catch (error: any) {
     console.error('Signin error:', error)
     return new NextResponse(JSON.stringify({ 
