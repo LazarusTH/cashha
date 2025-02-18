@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
@@ -24,10 +26,8 @@ export async function GET(request: Request) {
     const { error } = await supabase.auth.verifyEmailChange(token);
 
     if (error) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 400 }
-      );
+       return NextResponse.redirect(new URL(`/signin?error=${error.message}`, request.url));
+
     }
 
     return NextResponse.redirect(new URL('/signin?verified=true', request.url));
