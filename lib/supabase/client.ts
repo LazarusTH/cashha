@@ -49,6 +49,19 @@ export const signIn = async (email: string, password: string) => {
   }
 }
 
+export const resetPassword = async (email: string) => {
+  try {
+    const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${process.env.NEXT_PUBLIC_URL}/reset-password`,
+    })
+    if (error) throw error
+    return { data, error: null }
+  } catch (error) {
+    console.error('Error in resetPassword:', error)
+    return { data: null, error }
+  }
+}
+
 export const signOut = async () => {
   try {
     const { error } = await supabase.auth.signOut()

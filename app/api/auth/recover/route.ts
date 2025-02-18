@@ -60,12 +60,17 @@ export async function POST(request: Request) {
     }
 
     // Generate password reset token
-    const { data: { user }, error: resetError } = await supabase.auth.admin.generateLink({
-      type: 'recovery',
+    const { error: resetError } = await supabase.auth.admin.generateLink({
+      type: "recovery",
       email,
+      options: {
+        redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/reset-password`,
+      },
     });
 
-    if (resetError) throw resetError;
+    if (resetError) {
+      throw resetError;
+    }
 
     // Log successful recovery
     await supabase.from("security_logs").insert({
@@ -91,3 +96,4 @@ export async function POST(request: Request) {
     );
   }
 }
+
