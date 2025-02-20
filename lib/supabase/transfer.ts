@@ -1,3 +1,4 @@
+import { DatabaseTransaction } from './db-transaction'
 import { supabase } from './client'
 import { getUserBalance } from './transactions'
 
@@ -21,44 +22,75 @@ export async function findUserByEmail(email: string) {
 }
 
 export async function createTransfer(data: TransferRequest) {
-  // Start by checking sender's balance
-  const senderBalance = await getUserBalance(data.senderId)
-  if (senderBalance < data.amount) {
-    throw new Error('Insufficient balance')
-  }
-
-  // If recipient email is provided, find the recipient
-  let recipientId = data.recipientId
-  if (data.recipientEmail) {
-    const recipient = await findUserByEmail(data.recipientEmail)
-    if (!recipient) {
-      throw new Error('Recipient not found')
+  const transaction = new DatabaseTransaction()
+  
+  try {
+    // Check sender's balance
+    const senderBalance = await getUserBalance(data.senderId)
+    if (senderBalance < data.amount) {
+      throw new Error('Insufficient balance')
     }
-    recipientId = recipient.id
-  }
 
-  if (!recipientId) {
-    throw new Error('Recipient not specified')
-  }
+    // Resolve recipient
+    let recipientId = data.recipientId
+    if (data.recipientEmail) {
+      const recipient = await findUserByEmail(data.recipientEmail)
+      if (!recipient) {
+        throw new Error('Recipient not found')
+      }
+      recipientId = recipient.id
+    }
 
-  // Create the transfer transaction
-  const { data: transaction, error } = await supabase
-    .from('transactions')
-    .insert([
+    if (!recipientId) {
+      throw new Error('Recipient not specified')
+    }
+
+    // Define transaction operations
+    const operations = [
+      // Deduct from sender
       {
-        user_id: data.senderId,
-        recipient_id: recipientId,
-        type: 'send',
-        amount: data.amount,
-        status: 'completed',
-        description: data.description || 'Money transfer',
+        table: 'balances',
+        type: 'update',
+        data: { 
+          amount: senderBalance - data.amount 
+        },
+        condition: { user_id: data.senderId }
       },
-    ])
-    .select()
-    .single()
+      // Add to recipient
+      {
+        table: 'balances',
+        type: 'update',
+        data: { 
+          amount: supabase.raw(`amount + ${data.amount}`) 
+        },
+        condition: { user_id: recipientId }
+      },
+      // Create transaction record
+      {
+        table: 'transactions',
+        type: 'insert',
+        data: {
+          user_id: data.senderId,
+          recipient_id: recipientId,
+          type: 'send',
+          amount: data.amount,
+          status: 'completed',
+          description: data.description
+        }
+      }
+    ]
 
-  if (error) throw error
-  return transaction
+    // Execute transaction with rollback support
+    const { success, error } = await transaction.execute(operations)
+    
+    if (!success) {
+      throw new Error(error || 'Transfer failed')
+    }
+
+    return { success: true }
+  } catch (error) {
+    throw error
+  }
 }
 
 export async function getUserTransferHistory(userId: string) {
@@ -67,15 +99,12 @@ export async function getUserTransferHistory(userId: string) {
     .select(`
       *,
       recipient:profiles!recipient_id (
-        email,
-        full_name
-      ),
-      sender:profiles!user_id (
+        id,
         email,
         full_name
       )
     `)
-    .or(`user_id.eq.${userId},recipient_id.eq.${userId}`)
+    .eq('user_id', userId)
     .eq('type', 'send')
     .order('created_at', { ascending: false })
 

@@ -1,29 +1,78 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { createClientComponentClient, User } from '@supabase/auth-helpers-nextjs'
 import { useRouter } from 'next/navigation'
 import { AppError, handleAuthError } from '@/lib/utils/error-handler'
 
-export function useAuth() {
+interface AuthState {
+  user: User | null;
+  loading: boolean;
+  error: Error | null;
+  isAdmin: boolean;
+}
+
+interface AuthActions {
+  signIn: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string) => Promise<void>;
+  signOut: () => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
+  updatePassword: (newPassword: string) => Promise<void>;
+}
+
+export function useAuth(): AuthState & AuthActions {
   const supabase = createClientComponentClient()
   const router = useRouter()
-  const [loading, setLoading] = useState(true)
-  const [user, setUser] = useState<any>(null)
-  const [error, setError] = useState<Error | null>(null)
+  const [state, setState] = useState<AuthState>({
+    loading: true,
+    user: null,
+    error: null,
+    isAdmin: false
+  })
+
+  const updateState = (updates: Partial<AuthState>) => {
+    setState(current => ({ ...current, ...updates }))
+  }
+
+  const handleError = (error: unknown, context: string) => {
+    console.error(`Auth error (${context}):`, error)
+    const appError = error instanceof Error ? error : new Error(`${context} failed`)
+    updateState({ error: appError })
+    handleAuthError(error)
+  }
+
+  const checkAdminStatus = useCallback(async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', userId)
+        .single()
+
+      if (error) throw error
+      return data?.role === 'admin'
+    } catch (error) {
+      console.error('Admin check error:', error)
+      return false
+    }
+  }, [supabase])
 
   useEffect(() => {
     const getUser = async () => {
       try {
         const { data: { user }, error } = await supabase.auth.getUser()
         if (error) throw error
-        setUser(user)
-        setError(null)
+
+        const isAdmin = user ? await checkAdminStatus(user.id) : false
+        
+        updateState({
+          user,
+          isAdmin,
+          error: null,
+          loading: false
+        })
       } catch (error) {
-        setError(error instanceof Error ? error : new Error('Failed to get user'))
-        handleAuthError(error)
-      } finally {
-        setLoading(false)
+        handleError(error, 'Get user')
       }
     }
 
@@ -33,16 +82,23 @@ export function useAuth() {
       async (event, session) => {
         try {
           if (session?.user) {
-            setUser(session.user)
-            setError(null)
+            const isAdmin = await checkAdminStatus(session.user.id)
+            updateState({
+              user: session.user,
+              isAdmin,
+              error: null
+            })
           } else {
-            setUser(null)
+            updateState({
+              user: null,
+              isAdmin: false
+            })
           }
-          setLoading(false)
+          
+          updateState({ loading: false })
           router.refresh()
         } catch (error) {
-          setError(error instanceof Error ? error : new Error('Auth state change error'))
-          console.error('Auth state change error:', error)
+          handleError(error, 'Auth state change')
         }
       }
     )
@@ -50,89 +106,75 @@ export function useAuth() {
     return () => {
       subscription.unsubscribe()
     }
-  }, [supabase, router])
+  }, [supabase, router, checkAdminStatus])
 
-  const signIn = useCallback(async (email: string, password: string) => {
+  const signIn = async (email: string, password: string) => {
     try {
-      setLoading(true)
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      })
+      updateState({ loading: true, error: null })
+      const { error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) throw error
-      router.push('/user/dashboard')
-      setError(null)
     } catch (error) {
-      setError(new AppError('Invalid email or password', 401))
-      throw new AppError('Invalid email or password', 401)
+      handleError(error, 'Sign in')
     } finally {
-      setLoading(false)
+      updateState({ loading: false })
     }
-  }, [supabase, router])
+  }
 
-  const signUp = useCallback(async (email: string, password: string, metadata: any) => {
+  const signUp = async (email: string, password: string) => {
     try {
-      setLoading(true)
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: metadata,
-        },
-      })
+      updateState({ loading: true, error: null })
+      const { error } = await supabase.auth.signUp({ email, password })
       if (error) throw error
-      setError(null)
-      return true
     } catch (error) {
-      setError(error instanceof Error ? error : new Error('Failed to sign up'))
-      throw error
+      handleError(error, 'Sign up')
     } finally {
-      setLoading(false)
+      updateState({ loading: false })
     }
-  }, [supabase])
+  }
 
-  const signOut = useCallback(async () => {
+  const signOut = async () => {
     try {
+      updateState({ loading: true, error: null })
       const { error } = await supabase.auth.signOut()
       if (error) throw error
-      router.push('/auth/signin')
+      updateState({ user: null, isAdmin: false })
     } catch (error) {
-      handleAuthError(error)
+      handleError(error, 'Sign out')
+    } finally {
+      updateState({ loading: false })
     }
-  }, [supabase, router])
+  }
 
-  const resetPassword = useCallback(async (email: string) => {
+  const resetPassword = async (email: string) => {
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/reset-password`,
-      })
+      updateState({ loading: true, error: null })
+      const { error } = await supabase.auth.resetPasswordForEmail(email)
       if (error) throw error
-      return true
     } catch (error) {
-      throw new AppError('Failed to send reset password email', 400)
+      handleError(error, 'Reset password')
+    } finally {
+      updateState({ loading: false })
     }
-  }, [supabase])
+  }
 
-  const updatePassword = useCallback(async (password: string) => {
+  const updatePassword = async (newPassword: string) => {
     try {
-      const { error } = await supabase.auth.updateUser({
-        password,
-      })
+      updateState({ loading: true, error: null })
+      const { error } = await supabase.auth.updateUser({ password: newPassword })
       if (error) throw error
-      return true
     } catch (error) {
-      throw new AppError('Failed to update password', 400)
+      handleError(error, 'Update password')
+    } finally {
+      updateState({ loading: false })
     }
-  }, [supabase])
+  }
 
   return {
-    user,
-    loading,
-    error,
+    ...state,
     signIn,
     signUp,
     signOut,
     resetPassword,
-    updatePassword,
+    updatePassword
   }
 }
